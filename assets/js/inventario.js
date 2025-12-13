@@ -16,6 +16,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnExcel       = $('exportExcel');
   const btnClear       = $('clearReception');
 
+  const histDateInput  = $('histDateInput');
+
+  let histPicker      = null;   // flatpickr para histórico
+  let currentViewDate = null;   // null = día actual
+
   const mCodigo       = $('mCodigo');
   const mNombre       = $('mNombre');
   const mCodInv       = $('mCodInv');
@@ -57,6 +62,78 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function getCurrentBinId() {
     return INVENTARIO_BINS[CURRENT_INVENTARIO];
+  }
+
+
+  // Configura / refresca el calendario de histórico para la hoja actual
+  async function refreshHistoryPicker() {
+    if (!histDateInput || typeof flatpickr === 'undefined' || typeof getHistoryDates !== 'function') return;
+    try {
+      const docId = getCurrentBinId();
+      const fechas = await getHistoryDates(docId);
+      const fechasUnicas = Array.from(new Set((fechas || []).filter(Boolean)));
+
+      if (histPicker) {
+        try { histPicker.destroy(); } catch (e) {}
+        histPicker = null;
+      }
+
+      histPicker = flatpickr(histDateInput, {
+        dateFormat: 'Y-m-d',
+        allowInput: false,
+        enable: fechasUnicas,
+        onChange: function(selectedDates, dateStr) {
+          if (!dateStr) return;
+          loadHistoryForDate(dateStr);
+        }
+      });
+    } catch (e) {
+      console.error('Error al configurar calendario histórico:', e);
+    }
+  }
+
+  // Carga en pantalla el inventario guardado para una fecha específica
+  async function loadHistoryForDate(dateStr) {
+    if (!dateStr) return;
+    try {
+      currentViewDate = dateStr;
+
+      // Limpiar tabla y datos antes de cargar
+      body.innerHTML = '';
+      proveedorInput.value = '';
+      if (ubicacionInput) ubicacionInput.value = '';
+      recalcTotals();
+      updateButtons();
+
+      const record = await loadReceptionFromJSONBin(getCurrentBinId(), dateStr);
+      if (record && record.items && Array.isArray(record.items) && record.items.length) {
+        if (record.meta && record.meta.proveedor) {
+          proveedorInput.value = record.meta.proveedor;
+        }
+        if (record.meta && (record.meta.ubicacion || record.meta.numero_credito_fiscal)) {
+          if (ubicacionInput) {
+            ubicacionInput.value = record.meta.ubicacion || record.meta.numero_credito_fiscal;
+          }
+        }
+        record.items.forEach(it => {
+          addRow({
+            barcode:   it.codigo_barras || '',
+            nombre:    it.nombre || '',
+            codInvent: it.codigo_inventario || 'N/A',
+            bodega:    it.bodega || '',
+            fechaVenc: it.fecha_vencimiento || '',
+            cantidad:  (it.cantidad !== undefined && it.cantidad !== null) ? Number(it.cantidad) : '',
+            skipDuplicateCheck: true
+          });
+        });
+        recalcTotals();
+      } else {
+        Swal.fire('Sin datos', 'No hay inventario guardado para esta fecha.', 'info');
+      }
+    } catch (e) {
+      console.error('Error al cargar histórico para la fecha seleccionada:', e);
+      Swal.fire('Error', 'No se pudo cargar el histórico para esa fecha.', 'error');
+    }
   }
 
   function sanitizeName(s) {
@@ -575,6 +652,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   btnSave.addEventListener('click', () => {
+    // No permitir guardar si se está viendo un día histórico distinto al actual
+    if (currentViewDate && typeof getTodayString === 'function' && currentViewDate !== getTodayString()) {
+      Swal.fire(
+        'Vista histórica',
+        'Estás viendo el inventario del ' + currentViewDate + '. Para guardar cambios, vuelve al día actual.',
+        'info'
+      );
+      return;
+    }
+
     if (!ubicacionInput || !ubicacionInput.value.trim()) {
       Swal.fire('Ubicación requerida', 'Ingrese la ubicación del producto.', 'info');
       return;
@@ -620,10 +707,15 @@ document.addEventListener('DOMContentLoaded', async () => {
           msgEl.style.display = 'block';
           setTimeout(() => msgEl.style.display = 'none', 4000);
         }
+        // Refrescar calendario de histórico (incluye el día de hoy)
+        if (typeof refreshHistoryPicker === 'function') {
+          refreshHistoryPicker();
+        }
         Swal.fire('Guardado', 'El inventario ha sido guardado.', 'success');
       })
       .catch(e => Swal.fire('Error', String(e), 'error'));
   });
+
 
   await (async function loadAndRenderFromCurrentBin() {
     try {
@@ -655,9 +747,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   })();
 
+  if (typeof refreshHistoryPicker === 'function') {
+    refreshHistoryPicker();
+  }
+
   inventarioSelect.addEventListener('change', async () => {
     CURRENT_INVENTARIO = inventarioSelect.value;
     localStorage.setItem('TR_AVM_CURRENT_INVENTARIO', CURRENT_INVENTARIO);
+
+    // Al cambiar de hoja se vuelve al día actual
+    currentViewDate = null;
+    if (histPicker) {
+      try { histPicker.clear(); } catch (e) {}
+    }
+    if (histDateInput) {
+      histDateInput.value = '';
+    }
 
     body.innerHTML = '';
     proveedorInput.value = '';
@@ -691,6 +796,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     } catch (e) {
       console.error('Error al cargar estado de la hoja de inventario:', e);
+    }
+
+    // Refrescar calendario de histórico para la nueva hoja
+    if (typeof refreshHistoryPicker === 'function') {
+      refreshHistoryPicker();
     }
   });
 
@@ -838,6 +948,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   btnClear.addEventListener('click', () => {
+    // No permitir limpiar si se está viendo un día histórico distinto al actual
+    if (currentViewDate && typeof getTodayString === 'function' && currentViewDate !== getTodayString()) {
+      Swal.fire(
+        'Vista histórica',
+        'Estás viendo el inventario del ' + currentViewDate + '. Para limpiar, vuelve al día actual.',
+        'info'
+      );
+      return;
+    }
+
     if (body.rows.length === 0 && !(proveedorInput.value.trim() || (ubicacionInput && ubicacionInput.value.trim()))) return;
     Swal.fire({
       title: '¿Vaciar y comenzar nuevo inventario?',
@@ -875,6 +995,10 @@ document.addEventListener('DOMContentLoaded', async () => {
               msgEl.textContent = 'Inventario limpiado y guardado. Lista para empezar una nueva hoja.';
               msgEl.style.display = 'block';
               setTimeout(() => msgEl.style.display = 'none', 4000);
+            }
+            // Refrescar calendario de histórico (por si el día actual cambia de estado)
+            if (typeof refreshHistoryPicker === 'function') {
+              refreshHistoryPicker();
             }
             Swal.fire('Listo', 'Se limpió y guardó el estado vacío.', 'success');
           })
