@@ -102,14 +102,17 @@ body {
 
 
 /* Indicador en el calendario para días con inventario guardado */
-.hist-date-wrapper .flatpickr-day.has-history::after {
+.hist-date-wrapper .flatpickr-day.has-history {
+  position: relative;
+}
+.flatpickr-day.has-history::after {
   content: "";
   position: absolute;
-  bottom: 3px;
+  bottom: 0.25rem;
   left: 50%;
   transform: translateX(-50%);
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   background-color: #0d6efd; /* punto azul */
 }
