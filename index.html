@@ -163,14 +163,21 @@
 
             <!-- Histórico diario -->
             <div class="row mt-2">
-              <div class="col-12 col-md-6">
+              <div class="col-12 col-md-6 hist-date-wrapper">
                 <label class="form-label fw-semibold mb-1">Consultar histórico por día</label>
-                <input id="histDateInput" type="text" class="form-control form-control-sm" placeholder="Seleccione una fecha con registros">
+                <input id="histDateInput" type="text" class="form-control form-control-sm" placeholder="Seleccione una fecha">
                 <div class="form-text small text-muted">
-                  Solo se mostrarán días que tengan inventario guardado.
+                  Los días con inventario guardado se marcarán con un punto azul en el calendario.
                 </div>
+                <div class="form-text small" id="histViewModeText">
+                  Modo: inventario del día actual (editable).
+                </div>
+                <button type="button" id="btnHistToday" class="btn btn-outline-secondary btn-sm mt-2 w-100">
+                  Ver inventario actual (hoy)
+                </button>
               </div>
             </div>
+
 
             <!-- Scanner de código de barras -->
             <div class="row mt-2">

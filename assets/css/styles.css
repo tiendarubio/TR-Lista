@@ -99,3 +99,17 @@ body {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
   font-size: 0.8rem;
 }
+
+
+/* Indicador en el calendario para días con inventario guardado */
+.hist-date-wrapper .flatpickr-day.has-history::after {
+  content: "";
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: #0d6efd; /* punto azul */
+}

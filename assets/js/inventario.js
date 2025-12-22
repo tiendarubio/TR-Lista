@@ -18,8 +18,59 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const histDateInput  = $('histDateInput');
 
+  function setHistoricalViewMode(isHistorical) {
+    const histModeText = document.getElementById('histViewModeText');
+
+    if (histModeText) {
+      if (isHistorical) {
+        const labelDate = currentViewDate || '';
+        histModeText.textContent = labelDate
+          ? 'Modo histórico (' + labelDate + '): solo lectura.'
+          : 'Modo histórico: solo lectura.';
+        histModeText.classList.remove('text-muted');
+        histModeText.classList.add('text-primary');
+      } else {
+        histModeText.textContent = 'Modo: inventario del día actual (editable).';
+        histModeText.classList.add('text-muted');
+        histModeText.classList.remove('text-primary');
+      }
+    }
+
+    const disableEditing = isHistorical;
+
+    if (proveedorInput) proveedorInput.disabled = disableEditing;
+    if (ubicacionInput) ubicacionInput.disabled = disableEditing;
+
+    const searchInputEl   = document.getElementById('searchInput');
+    const btnScanEl       = document.getElementById('btnScan');
+    const btnOpenManualEl = document.getElementById('btnOpenManual');
+    const fileScanEl      = document.getElementById('fileScan');
+
+    if (searchInputEl)    searchInputEl.disabled    = disableEditing;
+    if (btnScanEl)        btnScanEl.disabled        = disableEditing;
+    if (btnOpenManualEl)  btnOpenManualEl.disabled  = disableEditing;
+    if (fileScanEl)       fileScanEl.disabled       = disableEditing;
+
+    // Deshabilitar inputs y botones dentro de la tabla
+    [...body.getElementsByTagName('tr')].forEach(tr => {
+      const venc    = tr.querySelector('.vencimiento');
+      const qty     = tr.querySelector('.qty');
+      const delBtn  = tr.querySelector('button');
+
+      if (venc)   venc.disabled   = disableEditing;
+      if (qty)    qty.disabled    = disableEditing;
+      if (delBtn) delBtn.disabled = disableEditing;
+    });
+
+    // Guardar / limpiar (los export siguen permitidos)
+    if (btnSave)  btnSave.disabled  = disableEditing;
+    if (btnClear) btnClear.disabled = disableEditing;
+  }
+
+
   let histPicker      = null;   // flatpickr para histórico
   let currentViewDate = null;   // null = día actual
+  let histDatesWithData = new Set();
 
   const mCodigo       = $('mCodigo');
   const mNombre       = $('mNombre');
@@ -72,6 +123,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const docId = getCurrentBinId();
       const fechas = await getHistoryDates(docId);
       const fechasUnicas = Array.from(new Set((fechas || []).filter(Boolean)));
+      histDatesWithData = new Set(fechasUnicas);
 
       if (histPicker) {
         try { histPicker.destroy(); } catch (e) {}
@@ -81,7 +133,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       histPicker = flatpickr(histDateInput, {
         dateFormat: 'Y-m-d',
         allowInput: false,
-        enable: fechasUnicas,
+        onDayCreate: function(dObj, dStr, fp, dayElem) {
+          try {
+            const date = dayElem.dateObj;
+            if (!date) return;
+            const iso = date.toISOString().slice(0, 10);
+            if (histDatesWithData && histDatesWithData.has(iso)) {
+              dayElem.classList.add('has-history');
+            }
+          } catch (_) {}
+        },
         onChange: function(selectedDates, dateStr) {
           if (!dateStr) return;
           loadHistoryForDate(dateStr);
@@ -127,7 +188,12 @@ document.addEventListener('DOMContentLoaded', async () => {
           });
         });
         recalcTotals();
+        updateButtons();
+        setHistoricalViewMode(true);
       } else {
+        recalcTotals();
+        updateButtons();
+        setHistoricalViewMode(true);
         Swal.fire('Sin datos', 'No hay inventario guardado para esta fecha.', 'info');
       }
     } catch (e) {
@@ -152,6 +218,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const scanVideo   = $('scanVideo');
   const btnScanStop = $('btnScanStop');
   const fileScan    = $('fileScan');
+  const btnHistToday= $('btnHistToday');
+
 
   let mediaStream = null;
   let scanInterval = null;
@@ -579,7 +647,65 @@ document.addEventListener('DOMContentLoaded', async () => {
       venc.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
-          if (searchInput) searchInput.focus();
+        
+  if (btnHistToday) {
+    btnHistToday.addEventListener('click', async () => {
+      // Salir de modo histórico y volver al inventario del día actual
+      if (histPicker) {
+        histPicker.clear();
+      } else if (histDateInput) {
+        histDateInput.value = '';
+      }
+
+      if (typeof getTodayString === 'function') {
+        currentViewDate = getTodayString();
+      } else {
+        currentViewDate = null;
+      }
+
+      body.innerHTML = '';
+      proveedorInput.value = '';
+      if (ubicacionInput) ubicacionInput.value = '';
+      recalcTotals();
+      updateButtons();
+
+      try {
+        const record = await loadReceptionFromJSONBin(getCurrentBinId());
+        if (record && record.items && Array.isArray(record.items)) {
+          if (record.meta && record.meta.proveedor) {
+            proveedorInput.value = record.meta.proveedor;
+          }
+          if (record.meta && (record.meta.ubicacion || record.meta.numero_credito_fiscal)) {
+            if (ubicacionInput) {
+              ubicacionInput.value = record.meta.ubicacion || record.meta.numero_credito_fiscal;
+            }
+          }
+
+          record.items.forEach(it => {
+            addRow({
+              barcode:   it.codigo_barras || '',
+              nombre:    it.nombre || '',
+              codInvent: it.codigo_inventario || 'N/A',
+              bodega:    it.bodega || '',
+              fechaVenc: it.fecha_vencimiento || '',
+              cantidad:  (it.cantidad !== undefined && it.cantidad !== null)
+                           ? Number(it.cantidad)
+                           : '',
+              skipDuplicateCheck: true
+            });
+          });
+          recalcTotals();
+        }
+      } catch (e) {
+        console.error('Error al cargar inventario actual:', e);
+      }
+
+      updateButtons();
+      setHistoricalViewMode(false);
+    });
+  }
+
+  if (searchInput) searchInput.focus();
         }
       });
     }
@@ -747,6 +873,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   })();
 
+  // Al iniciar, los controles quedan en modo edición (día actual)
+  try { setHistoricalViewMode(false); } catch (e) {}
+
   if (typeof refreshHistoryPicker === 'function') {
     refreshHistoryPicker();
   }
@@ -763,6 +892,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (histDateInput) {
       histDateInput.value = '';
     }
+
+    // Volver a modo edición (día actual) al cambiar de hoja
+    try { setHistoricalViewMode(false); } catch (e) {}
 
     body.innerHTML = '';
     proveedorInput.value = '';
@@ -1006,6 +1138,64 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   });
+
+
+  if (btnHistToday) {
+    btnHistToday.addEventListener('click', async () => {
+      // Salir de modo histórico y volver al inventario del día actual
+      if (histPicker) {
+        histPicker.clear();
+      } else if (histDateInput) {
+        histDateInput.value = '';
+      }
+
+      if (typeof getTodayString === 'function') {
+        currentViewDate = getTodayString();
+      } else {
+        currentViewDate = null;
+      }
+
+      body.innerHTML = '';
+      proveedorInput.value = '';
+      if (ubicacionInput) ubicacionInput.value = '';
+      recalcTotals();
+      updateButtons();
+
+      try {
+        const record = await loadReceptionFromJSONBin(getCurrentBinId());
+        if (record && record.items && Array.isArray(record.items)) {
+          if (record.meta && record.meta.proveedor) {
+            proveedorInput.value = record.meta.proveedor;
+          }
+          if (record.meta && (record.meta.ubicacion || record.meta.numero_credito_fiscal)) {
+            if (ubicacionInput) {
+              ubicacionInput.value = record.meta.ubicacion || record.meta.numero_credito_fiscal;
+            }
+          }
+
+          record.items.forEach(it => {
+            addRow({
+              barcode:   it.codigo_barras || '',
+              nombre:    it.nombre || '',
+              codInvent: it.codigo_inventario || 'N/A',
+              bodega:    it.bodega || '',
+              fechaVenc: it.fecha_vencimiento || '',
+              cantidad:  (it.cantidad !== undefined && it.cantidad !== null)
+                           ? Number(it.cantidad)
+                           : '',
+              skipDuplicateCheck: true
+            });
+          });
+          recalcTotals();
+        }
+      } catch (e) {
+        console.error('Error al cargar inventario actual:', e);
+      }
+
+      updateButtons();
+      setHistoricalViewMode(false);
+    });
+  }
 
   if (searchInput) searchInput.focus();
 });
