@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>TRLista</title>
+  <link rel="icon" type="image/png" href="assets/img/trlogo.png">
+
+  <!-- Bootstrap & FontAwesome -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+
+  <!-- Estilos propios -->
+  
+  <link href="assets/css/styles.css" rel="stylesheet">
+
+  <!-- Librerías JS externas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://unpkg.com/@zxing/library@0.23.0"></script>
+</head>
+<body class="bg-light">
+
+  <!-- TOP NAVBAR -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+    <div class="container-fluid">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+        <img src="assets/img/trlogo.png" alt="Logo TR" class="logo-navbar">
+        <span class="fw-semibold">TRLista</span>
+      </a>
+
+      <div id="authUserNav" class="navbar-nav ms-auto align-items-center gap-2 flex-row d-none">
+        <span class="auth-user-chip" id="authUserChip">
+          <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
+          <span id="authUserLabel">Sesión</span>
+        </span>
+        <span id="authRoleChip" class="auth-role-chip d-none">Rol</span>
+        <button type="button" id="btnLogout" class="btn btn-outline-light btn-sm auth-logout-btn" title="Cerrar sesión">
+          <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+          <span>Salir</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <main class="container-fluid py-4">
+    <div class="row g-4">
+
+      <!-- PANEL PRINCIPAL -->
+      <div class="col-12">
+
+        
+<div class="card shadow-sm mb-4 workspace-top-card workspace-config-card">
+  <div class="card-header bg-white border-0">
+    <h6 class="card-title mb-0">
+      <i class="fa-solid fa-sliders me-2 text-primary"></i>
+      Configuración e histórico
+    </h6>
+  </div>
+
+  <div class="card-body border-top">
+    <div class="row g-3 align-items-start workspace-config-row-balanced">
+      <div class="col-12 col-lg-4">
+        <div class="config-field-stack h-100">
+          <label for="storeSelect" class="form-label fw-semibold mb-1">Tienda</label>
+          <div class="store-select-shell store-tone-morazan">
+            <span class="store-select-icon" aria-hidden="true">
+              <i class="fa-solid fa-store"></i>
+            </span>
+            <select id="storeSelect" class="form-select form-select-sm">
+              <option value="lista_sexta_calle">Sexta Calle</option>
+              <option value="lista_avenida_morazan" selected>Avenida Morazán</option>
+              <option value="lista_centro_comercial">Centro Comercial</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-4">
+        <div class="config-field-stack h-100">
+          <label for="versionSelect" class="form-label fw-semibold mb-1">Versión de lista</label>
+          <select id="versionSelect" class="form-select form-select-sm">
+            <option value="base" selected>Principal</option>
+            <option value="alterna">Alterna</option>
+            <option value="traslado" hidden disabled>Traslado</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-4">
+        <div class="hist-date-wrapper config-field-stack h-100">
+          <label for="histDateInput" class="form-label fw-semibold mb-1">Recepciones por fecha</label>
+          <div class="history-search-shell history-calendar-shell">
+            <div class="control-shell control-shell-search control-shell-history">
+              <span class="control-icon" aria-hidden="true">
+                <i class="fa-solid fa-calendar-day"></i>
+              </span>
+
+              <input
+                id="histDateInput"
+                type="text"
+                class="form-control control-input"
+                placeholder="Selecciona fecha"
+                autocomplete="off"
+                readonly
+              >
+
+              <div class="control-actions control-actions-compact">
+                <button type="button" id="btnHistToday" class="btn btn-outline-secondary control-inline-btn" title="Volver a hoy">
+                  <i class="fa-solid fa-rotate-left"></i>
+                  <span>Hoy</span>
+                </button>
+              </div>
+            </div>
+
+            <div id="histCalendarPanel" class="history-calendar-panel d-none" aria-hidden="true"></div>
+          </div>
+
+          <div class="form-text small" id="histViewModeText">
+            Modo: checklist del día actual (editable).
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 d-none">
+        <div class="store-badge-wrap">
+          <span id="storeBadge" class="badge-store badge-morazan">
+            <i class="fa-solid fa-store"></i>
+            <span id="storeBadgeText">Avenida Morazán</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+<div id="requestFlowCard" class="card shadow-sm mb-4 request-flow-card d-none" aria-live="polite">
+  <div class="card-body">
+    <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+      <div>
+        <div class="request-flow-kicker">Solicitud a bodega</div>
+        <h6 id="requestFlowTitle" class="mb-1">Inicia una lista para esta sucursal.</h6>
+        <div id="requestFlowMeta" class="small text-muted">Cuando finalices, la lista quedará enviada y bloqueada para edición.</div>
+      </div>
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <span id="requestStatusBadge" class="badge rounded-pill text-bg-secondary d-none">Sin iniciar</span>
+        <button type="button" id="btnStartList" class="btn btn-primary btn-sm">
+          <i class="fa-solid fa-play me-1" aria-hidden="true"></i>
+          <span>Iniciar lista</span>
+        </button>
+        <button type="button" id="btnSubmitRequest" class="btn btn-success btn-sm d-none">
+          <i class="fa-solid fa-paper-plane me-1" aria-hidden="true"></i>
+          <span>Finalizar y enviar</span>
+        </button>
+        <button type="button" id="btnViewCurrentRequest" class="btn btn-outline-primary btn-sm d-none">
+          <i class="fa-solid fa-eye me-1" aria-hidden="true"></i>
+          <span>Ver solicitud</span>
+        </button>
+        <button type="button" id="btnConfirmRequestReceived" class="btn btn-success btn-sm d-none">
+          <i class="fa-solid fa-box-open me-1" aria-hidden="true"></i>
+          <span>Confirmar recibido</span>
+        </button>
+        <button type="button" id="btnViewRequestHistory" class="btn btn-outline-secondary btn-sm">
+          <i class="fa-solid fa-list-ul me-1" aria-hidden="true"></i>
+          <span>Solicitudes</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="warehouseInboxCard" class="card shadow-sm mb-4 warehouse-inbox-card d-none" aria-live="polite">
+  <div class="card-body">
+    <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+      <div>
+        <div class="request-flow-kicker">Bodega</div>
+        <h6 class="mb-1">Solicitudes recibidas</h6>
+        <div id="warehouseInboxMeta" class="small text-muted">Consulta las listas enviadas por las sucursales.</div>
+      </div>
+      <div class="warehouse-actions d-flex flex-wrap gap-2 align-items-center">
+        <button type="button" id="btnWarehouseInbox" class="btn btn-outline-primary btn-sm position-relative">
+          <i class="fa-solid fa-inbox me-1" aria-hidden="true"></i>
+          <span>Ver bandeja</span>
+          <span id="warehouseInboxBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill text-bg-danger d-none">0</span>
+        </button>
+        <button type="button" id="btnCreateWarehouseRequest" class="btn btn-outline-primary btn-sm d-none">
+          <i class="fa-solid fa-circle-plus me-1" aria-hidden="true"></i>
+          <span>Crear traslado</span>
+        </button>
+
+        <details class="toolbar-menu toolbar-menu-compact warehouse-actions-menu" id="warehouseActionsMenu">
+          <summary class="btn btn-outline-secondary btn-sm toolbar-menu-toggle" title="Más acciones de bodega">
+            <i class="fa-solid fa-plus" aria-hidden="true"></i>
+            <span>Acciones</span>
+          </summary>
+          <div class="toolbar-menu-panel warehouse-actions-panel">
+            <div class="toolbar-menu-title">Solicitud activa</div>
+            <div class="toolbar-menu-actions">
+              <button type="button" id="btnCloseWarehouseRequest" class="btn btn-outline-secondary btn-sm d-none">
+                <i class="fa-solid fa-xmark me-1" aria-hidden="true"></i>
+                <span>Cerrar solicitud</span>
+              </button>
+              <button type="button" id="btnMarkRequestDispatched" class="btn btn-success btn-sm d-none">
+                <i class="fa-solid fa-truck-ramp-box me-1" aria-hidden="true"></i>
+                <span>Marcar despachada</span>
+              </button>
+              <button type="button" id="btnCancelWarehouseRequest" class="btn btn-outline-danger btn-sm d-none">
+                <i class="fa-solid fa-ban me-1" aria-hidden="true"></i>
+                <span>Cancelar solicitud</span>
+              </button>
+            </div>
+            <div class="toolbar-menu-title mt-2">Herramientas</div>
+            <div class="toolbar-menu-actions">
+              <button type="button" id="btnMergeWarehouseRequests" class="btn btn-outline-warning btn-sm d-none">
+                <i class="fa-solid fa-code-merge me-1" aria-hidden="true"></i>
+                <span>Fusionar solicitudes</span>
+              </button>
+              <button type="button" id="btnWarehouseNotifications" class="btn btn-outline-secondary btn-sm warehouse-notification-toggle d-none" title="Activar notificaciones del navegador">
+                <i class="fa-regular fa-bell me-1" aria-hidden="true"></i>
+                <span>Notificaciones</span>
+              </button>
+            </div>
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+</div>
+
+        <!-- Card: Checklist -->
+        <div class="card shadow-sm">
+          <div class="card-header bg-white border-0 checklist-card-header">
+          <div class="checklist-header-shell">
+            <div class="checklist-header-top">
+              <div class="checklist-heading-block">
+                <h6 class="card-title mb-0">
+                  <i class="fa-solid fa-list-check me-2 text-primary"></i>
+                  Checklist de productos
+                </h6>
+              </div>
+
+              <div class="workspace-status-inline">
+                <span class="workspace-status-badge" id="lastSaved">
+                  <i class="fa-solid fa-clock-rotate-left me-1"></i>
+                  Aún no guardado.
+                </span>
+              </div>
+            </div>
+
+            <div class="checklist-primary-toolbar" role="toolbar" aria-label="Acciones principales">
+              <button id="btnSave" class="btn btn-primary btn-sm" title="Guardar checklist">
+                <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+                <span>Guardar</span>
+              </button>
+
+              <button id="btnExport" class="btn btn-outline-danger btn-sm" title="Exportar checklist">
+                <i class="fa-solid fa-file-export" aria-hidden="true"></i>
+                <span>Exportar</span>
+              </button>
+
+              <details class="toolbar-menu toolbar-menu-compact" id="moreActionsMenu">
+                <summary class="btn btn-outline-secondary btn-sm toolbar-menu-toggle" title="Más acciones">
+                  <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
+                  <span>Más</span>
+                </summary>
+
+                <div class="toolbar-menu-panel">
+                  <div class="toolbar-menu-title">Más acciones</div>
+                  <div class="toolbar-menu-actions">
+                    <button type="button" id="btnToggleHistLock" class="btn btn-outline-warning btn-sm d-none" disabled aria-disabled="true" title="Desbloquear edición">
+                      <i class="fa-solid fa-unlock-keyhole" aria-hidden="true"></i>
+                      <span>Desbloq.</span>
+                    </button>
+                    <button type="button" id="btnToggleRequisition" class="btn btn-outline-secondary btn-sm" title="Estado de requisición">
+                      <i class="fa-regular fa-flag" aria-hidden="true"></i>
+                      <span>Req.</span>
+                    </button>
+                    <button type="button" id="btnCleanUnreviewed" class="btn btn-outline-primary btn-sm d-none" title="Eliminar no revisados">
+                      <i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i>
+                      <span>Limpiar no rev.</span>
+                    </button>
+                    <button id="btnClear" class="btn btn-outline-secondary btn-sm" title="Limpiar checklist">
+                      <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                      <span>Limpiar</span>
+                    </button>
+                  </div>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+
+          <div class="card-body border-top">
+            <div id="warehouseIdleNotice" class="alert alert-info d-none mb-3" role="status">
+              <div class="fw-semibold"><i class="fa-solid fa-inbox me-1"></i> Bodega sin solicitud abierta</div>
+              <div class="small mb-0">Abre una solicitud desde la bandeja para llenar esta tabla y comenzar la revisión.</div>
+            </div>
+            <div class="checklist-workspace">
+              <div class="checklist-search-shell">
+                <div class="checklist-search-toolbar checklist-search-toolbar-single">
+                  <div class="position-relative checklist-search-input-wrap">
+                    <div class="input-group input-group-sm search-bar-group search-bar-embedded">
+                      <button
+                        id="btnSearchModeToggle"
+                        class="btn btn-outline-secondary search-lead-chip search-mode-toggle"
+                        type="button"
+                        title="Cambiar a búsqueda en la lista actual"
+                        aria-label="Cambiar modo de búsqueda"
+                        data-search-mode="catalog"
+                      >
+                        <i class="fa-solid fa-box-archive" aria-hidden="true"></i>
+                        <span id="searchLeadLabel">Catálogo</span>
+                      </button>
+                      <input
+                        id="searchInput"
+                        type="text"
+                        class="form-control"
+                        placeholder="Nombre, código inventario o código de barras"
+                        autocomplete="off"
+                      >
+<button
+                        id="btnScan"
+                        class="btn btn-outline-primary search-action-btn"
+                        type="button"
+                        title="Escanear código de barras"
+                        aria-label="Escanear código de barras"
+                      >
+                        <i class="fa-solid fa-barcode"></i>
+                      </button>
+                      <button
+                        id="btnScannerSoundToggle"
+                        class="btn btn-outline-secondary search-action-btn scanner-sound-toggle"
+                        type="button"
+                        title="Sonido del escáner activado"
+                        aria-label="Activar o desactivar sonido del escáner"
+                        aria-pressed="true"
+                      >
+                        <i class="fa-solid fa-volume-high"></i>
+                      </button>
+                    </div>
+
+                    <input
+                      id="fileScan"
+                      class="d-none"
+                      type="file"
+                      accept="image/*,application/pdf,.pdf"
+                      capture="environment"
+                    >
+
+                    <ul id="suggestions" class="list-group shadow-sm search-suggestions"></ul>
+                  </div>
+                </div>
+
+                <div class="search-mode-meta-row">
+                  <span id="searchModeHint" class="search-mode-hint">Modo: catálogo</span>
+                  <span id="listSearchCount" class="list-search-count">0 / 0</span>
+                </div>
+
+                <div id="scanWrap" class="scanner-wrap scan-panel">
+                  <div class="scanner scanner-native-view">
+                    <video id="scanVideo" playsinline></video>
+                    <div class="scan-overlay"></div>
+                  </div>
+                  <div id="html5QrReader" class="html5-qrcode-reader d-none" aria-label="Escáner de códigos de barra"></div>
+                </div>
+</div>
+
+
+<div id="bulkSelectionBar" class="bulk-selection-bar d-none" hidden inert aria-hidden="true">
+  <button type="button" id="btnClearSelection" class="bulk-selection-close" aria-label="Cancelar selección" title="Cancelar selección">
+    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+  </button>
+
+  <div class="bulk-selection-summary">
+    <span class="bulk-selection-count-pill">
+      <i class="fa-regular fa-square-check" aria-hidden="true"></i>
+      <span id="bulkSelectionCount">0 seleccionados</span>
+    </span>
+  </div>
+
+  <div class="bulk-selection-actions" role="toolbar" aria-label="Acciones sobre selección">
+    <button type="button" id="btnToggleSelectAllBulk" class="btn btn-outline-secondary btn-sm" disabled aria-disabled="true" title="Seleccionar o quitar todas las filas visibles">
+      <i class="fa-regular fa-square-check" aria-hidden="true"></i>
+      <span>Todas</span>
+    </button>
+    <button id="btnReviewSelected" class="btn btn-outline-primary btn-sm" disabled aria-disabled="true" title="Marcar seleccionados como revisados">
+      <i class="fa-solid fa-clipboard-check" aria-hidden="true"></i>
+      <span>Revisar</span>
+    </button>
+    <button id="btnDispatchSelected" class="btn btn-outline-success btn-sm" disabled aria-disabled="true" title="Marcar seleccionados como despachados">
+      <i class="fa-solid fa-truck-ramp-box" aria-hidden="true"></i>
+      <span>Despachar</span>
+    </button>
+    <button type="button" id="btnMergeSelectedToToday" class="btn btn-outline-primary btn-sm d-none" disabled aria-disabled="true" title="Enviar seleccionados a hoy">
+      <i class="fa-solid fa-share-from-square" aria-hidden="true"></i>
+      <span>Enviar hoy</span>
+    </button>
+    <button id="btnDeleteSelected" class="btn btn-outline-danger btn-sm" disabled aria-disabled="true" title="Eliminar seleccionados">
+      <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+      <span>Eliminar</span>
+    </button>
+  </div>
+</div>
+
+<div class="table-checklist-shell mt-3">
+                <div class="table-responsive table-checklist-wrapper">
+              <table class="table table-sm table-bordered align-middle mb-0" id="chkTable">
+                <thead class="table-light">
+                  <tr>
+                    <th class="text-center text-nowrap bulk-select-col sticky-col-select">
+                      <div class="d-inline-flex align-items-center justify-content-center gap-2 bulk-select-header-wrap">
+                        <input id="chkSelectAllRows" class="form-check-input mt-0" type="checkbox" aria-label="Seleccionar todas las filas de la tabla">
+                        <span class="d-none d-md-inline">Sel.</span>
+                      </div>
+                    </th>
+                    <th class="text-center" style="width: 48px;">#</th>
+                    <th>Cód. barras</th>
+                    <th>Nombre</th>
+                    <th class="text-nowrap">Cód. inv.</th>
+                    <th id="thBodega" style="cursor:pointer;">
+                      Bodega <i class="fa-solid fa-arrow-up-wide-short ms-1 text-muted"></i>
+                    </th>
+                    <th class="text-center text-nowrap">Cant.</th>
+                    <th class="text-center text-nowrap">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="chkBody"></tbody>
+              </table>
+                </div>
+                <div id="mobileChecklistCards" class="mobile-checklist-cards d-md-none" aria-live="polite"></div>
+</div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /panel principal -->
+    </div><!-- /row -->
+  </main>
+
+  <div id="appLoadingOverlay" class="app-loading-overlay d-none" aria-hidden="true">
+    <div class="app-loading-card" role="status" aria-live="polite" aria-atomic="true">
+      <div class="spinner-border text-primary app-loading-spinner" aria-hidden="true"></div>
+      <div id="appLoadingText" class="app-loading-text">Cargando checklist...</div>
+    </div>
+  </div>
+
+  <div id="qtyPreviewBubble" class="qty-preview-bubble d-none" aria-hidden="true"></div>
+
+
+  <div id="scanToastHost" class="scan-toast-host" aria-live="polite" aria-atomic="false"></div>
+
+
+  <div id="mobileFabBackdrop" class="mobile-fab-backdrop d-none" aria-hidden="true"></div>
+  <div class="mobile-fab-shell d-md-none" aria-label="Acciones rápidas">
+    <div id="mobileFabMenu" class="mobile-fab-menu d-none" aria-hidden="true">
+      <button type="button" id="btnFabSave" class="btn btn-light mobile-fab-menu-btn">
+        <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+        <span>Guardar</span>
+      </button>
+      <button type="button" id="btnFabSearchList" class="btn btn-light mobile-fab-menu-btn">
+        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+        <span>Buscar en lista</span>
+      </button>
+      <button type="button" id="btnFabSortWarehouse" class="btn btn-light mobile-fab-menu-btn">
+        <i class="fa-solid fa-arrow-up-wide-short" aria-hidden="true"></i>
+        <span>Ordenar lista por bodega</span>
+      </button>
+      <button type="button" id="btnFabExport" class="btn btn-light mobile-fab-menu-btn">
+        <i class="fa-solid fa-file-export" aria-hidden="true"></i>
+        <span>Exportar</span>
+      </button>
+      <button type="button" id="btnFabScrollTop" class="btn btn-light mobile-fab-menu-btn">
+        <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
+        <span>Ir arriba</span>
+      </button>
+    </div>
+    <button type="button" id="mobileFabToggle" class="btn btn-primary mobile-fab-toggle" aria-expanded="false" aria-controls="mobileFabMenu" aria-label="Abrir acciones rápidas">
+      <i class="fa-solid fa-plus" aria-hidden="true"></i>
+    </button>
+  </div>
+
+  <div id="authGate" class="auth-gate" aria-hidden="false">
+    <div class="auth-gate-card shadow-lg">
+      <div class="auth-gate-brand">
+        <img src="assets/img/trlogo.png" alt="Logo TR" class="auth-gate-logo">
+        <div>
+          <h1 class="auth-gate-title">Ingreso de usuarios</h1>
+          <p class="auth-gate-subtitle">Accede con tu usuario autorizado de TRLista.</p>
+        </div>
+      </div>
+
+      <div id="authErrorBox" class="alert alert-danger d-none mb-3" role="alert">
+        <i class="fa-solid fa-circle-exclamation me-2" aria-hidden="true"></i>
+        <span id="authErrorText">No se pudo iniciar sesión.</span>
+      </div>
+
+      <div id="authDeniedBox" class="alert alert-warning d-none mb-3" role="alert">
+        <div class="d-flex flex-column gap-2">
+          <div>
+            <i class="fa-solid fa-user-lock me-2" aria-hidden="true"></i>
+            <span id="authDeniedText">Tu cuenta no tiene permisos para usar TRLista.</span>
+          </div>
+          <div>
+            <button type="button" id="btnDeniedLogout" class="btn btn-outline-dark btn-sm">
+              <i class="fa-solid fa-right-from-bracket me-2" aria-hidden="true"></i>
+              <span>Cerrar sesión</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <form id="loginForm" class="auth-form" autocomplete="on">
+        <div class="mb-3">
+          <label for="loginEmail" class="form-label fw-semibold">Usuario</label>
+          <input id="loginEmail" name="email" type="email" class="form-control" placeholder="correo@empresa.com" autocomplete="username" required>
+        </div>
+
+        <div class="mb-3">
+          <label for="loginPassword" class="form-label fw-semibold">Contraseña</label>
+          <input id="loginPassword" name="password" type="password" class="form-control" placeholder="Ingresa tu contraseña" autocomplete="current-password" required>
+        </div>
+
+        <button type="submit" id="loginSubmit" class="btn btn-primary w-100 auth-submit-btn">
+          <i class="fa-solid fa-right-to-bracket me-2" aria-hidden="true"></i>
+          <span>Ingresar</span>
+        </button>
+      </form>
+
+      <p id="authStatusText" class="auth-status-text mb-0 mt-3">Validando sesión...</p>
+    </div>
+  </div>
+
+
+  <!-- Bootstrap + SweetAlert -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <!-- Firebase (Firestore/Auth) -->
+  <script src="https://www.gstatic.com/firebasejs/12.6.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.6.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.6.0/firebase-messaging-compat.js"></script>
+  <script>
+    // Inicializar Firebase desde variables de entorno servidas por /api/client-config.
+    // Se usa una carga síncrona corta para mantener compatible el orden legacy de scripts.
+    (function initFirebaseFromEnv() {
+      if (typeof firebase === 'undefined' || !firebase.apps || firebase.apps.length) return;
+
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/client-config', false);
+        xhr.send(null);
+
+        if (xhr.status < 200 || xhr.status >= 300) {
+          throw new Error('No se pudo leer /api/client-config');
+        }
+
+        const payload = JSON.parse(xhr.responseText || '{}');
+        const firebaseConfig = payload.firebaseConfig || {};
+        const required = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
+        const missing = required.filter((key) => !firebaseConfig[key]);
+
+        if (missing.length) {
+          throw new Error('Faltan variables Firebase cliente: ' + missing.join(', '));
+        }
+
+        window.TR_CLIENT_CONFIG = payload;
+        firebase.initializeApp(firebaseConfig);
+      } catch (error) {
+        console.error('Error inicializando Firebase desde variables de entorno:', error);
+        window.TR_FIREBASE_INIT_ERROR = error;
+      }
+    })();
+  </script>
+
+  <!-- Barcode scanner library -->
+  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <!-- App -->
+  <script src="assets/js/trlista-utils.js"></script>
+  <script src="assets/js/trlista-checklist-helpers.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script src="assets/js/auth.js"></script>
+  <script src="assets/js/checklist.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "name": "trlista-firebase-historial",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "TRLista con Firestore + histórico por día (flatpickr) y catálogo/proveedores vía Google Sheets (proxy en Vercel).",
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}
