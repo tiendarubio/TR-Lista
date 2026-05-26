@@ -380,10 +380,6 @@
 
 
 <div id="bulkSelectionBar" class="bulk-selection-bar d-none" hidden inert aria-hidden="true">
-  <button type="button" id="btnClearSelection" class="bulk-selection-close" aria-label="Cancelar selección" title="Cancelar selección">
-    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-  </button>
-
   <div class="bulk-selection-summary">
     <span class="bulk-selection-count-pill">
       <i class="fa-regular fa-square-check" aria-hidden="true"></i>
@@ -408,9 +404,20 @@
       <i class="fa-solid fa-share-from-square" aria-hidden="true"></i>
       <span>Enviar hoy</span>
     </button>
-    <button id="btnDeleteSelected" class="btn btn-outline-danger btn-sm" disabled aria-disabled="true" title="Eliminar seleccionados">
+    <button type="button" id="btnBulkSelectionMore" class="btn btn-outline-primary btn-sm bulk-selection-more-toggle" disabled aria-disabled="true" aria-expanded="false" aria-controls="bulkSelectionMoreMenu" title="Más acciones de selección">
+      <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
+      <span>Más</span>
+    </button>
+  </div>
+
+  <div id="bulkSelectionMoreMenu" class="bulk-selection-more-menu d-none" role="menu" aria-hidden="true">
+    <button id="btnDeleteSelected" class="bulk-selection-more-item text-danger" type="button" disabled aria-disabled="true" role="menuitem" title="Eliminar seleccionados">
       <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
-      <span>Eliminar</span>
+      <span>Eliminar seleccionadas</span>
+    </button>
+    <button type="button" id="btnClearSelection" class="bulk-selection-more-item" disabled aria-disabled="true" role="menuitem" title="Cancelar selección">
+      <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+      <span>Cancelar selección</span>
     </button>
   </div>
 </div>

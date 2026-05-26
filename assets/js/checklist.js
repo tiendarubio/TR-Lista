@@ -55,6 +55,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const bulkSelectionCount = $('bulkSelectionCount');
   const btnClearSelection = $('btnClearSelection');
   const btnToggleSelectAllBulk = $('btnToggleSelectAllBulk');
+  const btnBulkSelectionMore = $('btnBulkSelectionMore');
+  const bulkSelectionMoreMenu = $('bulkSelectionMoreMenu');
   const moreActionsMenu = $('moreActionsMenu');
   const warehouseActionsMenu = $('warehouseActionsMenu');
   const appLoadingOverlay = $('appLoadingOverlay');
@@ -1995,9 +1997,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  function closeBulkSelectionMoreMenu() {
+    if (bulkSelectionMoreMenu) {
+      bulkSelectionMoreMenu.classList.add('d-none');
+      bulkSelectionMoreMenu.setAttribute('aria-hidden', 'true');
+    }
+
+    if (btnBulkSelectionMore) {
+      btnBulkSelectionMore.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  function toggleBulkSelectionMoreMenu() {
+    if (!bulkSelectionMoreMenu || !btnBulkSelectionMore || btnBulkSelectionMore.disabled) return;
+
+    const shouldOpen = bulkSelectionMoreMenu.classList.contains('d-none');
+    bulkSelectionMoreMenu.classList.toggle('d-none', !shouldOpen);
+    bulkSelectionMoreMenu.setAttribute('aria-hidden', String(!shouldOpen));
+    btnBulkSelectionMore.setAttribute('aria-expanded', String(shouldOpen));
+  }
+
   function closeAllToolbarMenus() {
     closeMoreActionsMenu();
     closeWarehouseActionsMenu();
+    closeBulkSelectionMoreMenu();
   }
 
   function setMobileFabOpen(shouldOpen) {
@@ -2867,15 +2890,27 @@ async function openInsertedRowsSearch(options = {}) {
       bulkSelectionBar.inert = !shouldShow;
       bulkSelectionBar.setAttribute('aria-hidden', String(!shouldShow));
       document.body.classList.toggle('has-mobile-selection', shouldShow && isCompactScreen());
+
+      if (!shouldShow) closeBulkSelectionMoreMenu();
     }
 
     if (bulkSelectionCount) {
-      bulkSelectionCount.textContent = selectedCount === 1 ? '1 seleccionada' : (selectedCount + ' seleccionadas');
+      if (isCompactScreen()) {
+        bulkSelectionCount.textContent = selectedCount === 1 ? '1 sel.' : (selectedCount + ' sel.');
+      } else {
+        bulkSelectionCount.textContent = selectedCount === 1 ? '1 seleccionada' : (selectedCount + ' seleccionadas');
+      }
     }
 
     if (btnClearSelection) {
       btnClearSelection.disabled = selectedCount === 0;
       btnClearSelection.setAttribute('aria-disabled', String(btnClearSelection.disabled));
+    }
+
+    if (btnBulkSelectionMore) {
+      btnBulkSelectionMore.disabled = selectedCount === 0;
+      btnBulkSelectionMore.setAttribute('aria-disabled', String(btnBulkSelectionMore.disabled));
+      if (selectedCount === 0) closeBulkSelectionMoreMenu();
     }
 
     if (btnToggleSelectAllBulk) {
@@ -3017,24 +3052,36 @@ async function openInsertedRowsSearch(options = {}) {
 
   if (btnReviewSelected) {
     btnReviewSelected.addEventListener('click', async () => {
+      closeBulkSelectionMoreMenu();
       await markSelectedRowsWithState('reviewed');
     });
   }
 
   if (btnDispatchSelected) {
     btnDispatchSelected.addEventListener('click', async () => {
+      closeBulkSelectionMoreMenu();
       await markSelectedRowsWithState('dispatched');
     });
   }
 
   if (btnDeleteSelected) {
     btnDeleteSelected.addEventListener('click', async () => {
+      closeBulkSelectionMoreMenu();
       await deleteSelectedRows();
+    });
+  }
+
+  if (btnBulkSelectionMore) {
+    btnBulkSelectionMore.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleBulkSelectionMoreMenu();
     });
   }
 
   if (btnClearSelection) {
     btnClearSelection.addEventListener('click', () => {
+      closeBulkSelectionMoreMenu();
       getBulkSelectionCheckboxes().forEach(cb => {
         cb.checked = false;
       });
@@ -3046,6 +3093,7 @@ async function openInsertedRowsSearch(options = {}) {
 
   if (btnToggleSelectAllBulk) {
     btnToggleSelectAllBulk.addEventListener('click', () => {
+      closeBulkSelectionMoreMenu();
       const checkboxes = getBulkSelectionCheckboxes().filter(cb => !cb.disabled);
       if (!checkboxes.length) {
         updateBulkSelectionUI();
@@ -3554,6 +3602,16 @@ async function openInsertedRowsSearch(options = {}) {
 
     if (warehouseActionsMenu?.hasAttribute('open') && !warehouseActionsMenu.contains(target)) {
       closeWarehouseActionsMenu();
+    }
+
+    if (
+      bulkSelectionMoreMenu &&
+      btnBulkSelectionMore &&
+      !bulkSelectionMoreMenu.classList.contains('d-none') &&
+      !bulkSelectionMoreMenu.contains(target) &&
+      !btnBulkSelectionMore.contains(target)
+    ) {
+      closeBulkSelectionMoreMenu();
     }
   });
 
