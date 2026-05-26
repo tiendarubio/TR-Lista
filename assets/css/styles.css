@@ -4802,3 +4802,48 @@ main.container-fluid,
     gap: 0.7rem;
   }
 }
+
+/* === Fix: scroll propio para sugerencias de búsqueda en móvil === */
+.checklist-search-input-wrap {
+  position: relative;
+  z-index: 20;
+}
+
+.search-suggestions:not(:empty) {
+  display: block;
+}
+
+.search-suggestions {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y !important;
+  scrollbar-gutter: stable;
+}
+
+.search-suggestions .list-group-item {
+  cursor: pointer;
+}
+
+@media (max-width: 767.98px) {
+  .checklist-search-input-wrap {
+    z-index: 1070;
+  }
+
+  .search-suggestions {
+    max-height: min(52svh, 360px) !important;
+    padding-block: 0.25rem;
+    border-radius: 0.9rem;
+    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.16);
+    will-change: scroll-position;
+    contain: content;
+  }
+
+  .search-suggestions .list-group-item {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+}
+

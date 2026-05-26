@@ -24,6 +24,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnSearchModeToggle = $('btnSearchModeToggle');
   const searchLeadLabel = $('searchLeadLabel');
   const suggestions = $('suggestions');
+
+
+  // Permite que la lista desplegable del buscador tenga scroll propio en móvil.
+  // No usamos preventDefault: así el navegador conserva el scroll natural de la lista.
+  if (suggestions) {
+    ['touchstart', 'touchmove', 'wheel'].forEach(eventName => {
+      suggestions.addEventListener(eventName, event => {
+        event.stopPropagation();
+      }, { passive: true });
+    });
+  }
   const btnSave = $('btnSave');
   const btnExport = $('btnExport');
   const btnToggleRequisition = $('btnToggleRequisition');
