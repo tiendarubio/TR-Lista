@@ -263,30 +263,34 @@
                 <span>Exportar</span>
               </button>
 
+              <button type="button" id="btnToggleRequisition" class="btn btn-outline-secondary btn-sm" title="Estado de requisición">
+                <i class="fa-regular fa-flag" aria-hidden="true"></i>
+                <span>Req.</span>
+              </button>
+
               <details class="toolbar-menu toolbar-menu-compact" id="moreActionsMenu">
                 <summary class="btn btn-outline-secondary btn-sm toolbar-menu-toggle" title="Más acciones">
-                  <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
-                  <span>Más</span>
+                  <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                  <span>Acciones</span>
                 </summary>
 
                 <div class="toolbar-menu-panel">
-                  <div class="toolbar-menu-title">Más acciones</div>
+                  <div class="toolbar-menu-title">Acciones de tabla</div>
                   <div class="toolbar-menu-actions">
                     <button type="button" id="btnToggleHistLock" class="btn btn-outline-warning btn-sm d-none" disabled aria-disabled="true" title="Desbloquear edición">
                       <i class="fa-solid fa-unlock-keyhole" aria-hidden="true"></i>
-                      <span>Desbloq.</span>
-                    </button>
-                    <button type="button" id="btnToggleRequisition" class="btn btn-outline-secondary btn-sm" title="Estado de requisición">
-                      <i class="fa-regular fa-flag" aria-hidden="true"></i>
-                      <span>Req.</span>
+                      <span>Desbloquear edición</span>
                     </button>
                     <button type="button" id="btnCleanUnreviewed" class="btn btn-outline-primary btn-sm d-none" title="Eliminar no revisados">
                       <i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i>
-                      <span>Limpiar no rev.</span>
+                      <span>Limpiar no revisados</span>
                     </button>
-                    <button id="btnClear" class="btn btn-outline-secondary btn-sm" title="Limpiar checklist">
+                  </div>
+                  <div class="toolbar-menu-title mt-2">Zona de cuidado</div>
+                  <div class="toolbar-menu-actions">
+                    <button id="btnClear" class="btn btn-outline-danger btn-sm" title="Limpiar checklist">
                       <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
-                      <span>Limpiar</span>
+                      <span>Limpiar todo</span>
                     </button>
                   </div>
                 </div>
@@ -473,6 +477,14 @@
       <button type="button" id="btnFabExport" class="btn btn-light mobile-fab-menu-btn">
         <i class="fa-solid fa-file-export" aria-hidden="true"></i>
         <span>Exportar</span>
+      </button>
+      <button type="button" id="btnFabRequisition" class="btn btn-light mobile-fab-menu-btn d-none">
+        <i class="fa-regular fa-flag" aria-hidden="true"></i>
+        <span>Requisición pendiente</span>
+      </button>
+      <button type="button" id="btnFabClear" class="btn btn-light mobile-fab-menu-btn mobile-fab-danger">
+        <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+        <span>Limpiar todo</span>
       </button>
       <button type="button" id="btnFabScrollTop" class="btn btn-light mobile-fab-menu-btn">
         <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>

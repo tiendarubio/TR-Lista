@@ -39,6 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnClearSelection = $('btnClearSelection');
   const btnToggleSelectAllBulk = $('btnToggleSelectAllBulk');
   const moreActionsMenu = $('moreActionsMenu');
+  const warehouseActionsMenu = $('warehouseActionsMenu');
   const appLoadingOverlay = $('appLoadingOverlay');
   const appLoadingText = $('appLoadingText');
   const qtyPreviewBubble = $('qtyPreviewBubble');
@@ -49,6 +50,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnFabSearchList = $('btnFabSearchList');
   const btnFabSortWarehouse = $('btnFabSortWarehouse');
   const btnFabExport = $('btnFabExport');
+  const btnFabRequisition = $('btnFabRequisition');
+  const btnFabClear = $('btnFabClear');
   const btnFabScrollTop = $('btnFabScrollTop');
   const searchModeHint = $('searchModeHint');
   const listSearchCount = $('listSearchCount');
@@ -1870,6 +1873,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  function closeWarehouseActionsMenu() {
+    if (warehouseActionsMenu?.hasAttribute('open')) {
+      warehouseActionsMenu.removeAttribute('open');
+    }
+  }
+
+  function closeAllToolbarMenus() {
+    closeMoreActionsMenu();
+    closeWarehouseActionsMenu();
+  }
+
   function setMobileFabOpen(shouldOpen) {
     if (!mobileFabToggle || !mobileFabMenu || !mobileFabBackdrop) return;
     const isOpen = !!shouldOpen;
@@ -3197,24 +3211,32 @@ async function openInsertedRowsSearch() {
       btnToggleRequisition.classList.add('d-none');
       btnToggleRequisition.disabled = true;
       btnToggleRequisition.setAttribute('aria-disabled', 'true');
+      if (btnFabRequisition) btnFabRequisition.classList.add('d-none');
       return;
     }
 
     btnToggleRequisition.classList.remove('d-none');
+    if (btnFabRequisition) btnFabRequisition.classList.remove('d-none');
     const locked = isEditingLocked();
     btnToggleRequisition.disabled = locked;
     btnToggleRequisition.setAttribute('aria-disabled', String(locked));
+    if (btnFabRequisition) {
+      btnFabRequisition.disabled = locked;
+      btnFabRequisition.setAttribute('aria-disabled', String(locked));
+    }
     btnToggleRequisition.classList.remove('btn-outline-secondary', 'btn-success', 'text-white');
 
     if (requisitionDone) {
       btnToggleRequisition.classList.add('btn-success', 'text-white');
       setToolbarButtonContent(btnToggleRequisition, 'fa-solid fa-flag', 'Req. hecha');
+      if (btnFabRequisition) setToolbarButtonContent(btnFabRequisition, 'fa-solid fa-flag', 'Requisición hecha');
       btnToggleRequisition.title = requisitionDoneAt
         ? ('Marcada como hecha: ' + formatSV(requisitionDoneAt))
         : 'Marcada como requisición hecha.';
     } else {
       btnToggleRequisition.classList.add('btn-outline-secondary');
       setToolbarButtonContent(btnToggleRequisition, 'fa-regular fa-flag', 'Req. pend.');
+      if (btnFabRequisition) setToolbarButtonContent(btnFabRequisition, 'fa-regular fa-flag', 'Requisición pendiente');
       btnToggleRequisition.title = 'Marcar esta lista como requisición hecha.';
     }
   }
@@ -3450,17 +3472,33 @@ async function openInsertedRowsSearch() {
   });
 
   document.addEventListener('click', (e) => {
-    if (!moreActionsMenu?.hasAttribute('open')) return;
     const target = e.target;
-    if (target instanceof Node && !moreActionsMenu.contains(target)) {
+    if (!(target instanceof Node)) return;
+
+    if (moreActionsMenu?.hasAttribute('open') && !moreActionsMenu.contains(target)) {
       closeMoreActionsMenu();
+    }
+
+    if (warehouseActionsMenu?.hasAttribute('open') && !warehouseActionsMenu.contains(target)) {
+      closeWarehouseActionsMenu();
     }
   });
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      closeMoreActionsMenu();
+      closeAllToolbarMenus();
     }
+  });
+
+
+  [moreActionsMenu, warehouseActionsMenu].forEach(menu => {
+    if (!menu) return;
+    menu.addEventListener('click', (e) => {
+      const action = e.target instanceof Element ? e.target.closest('button') : null;
+      if (action && !action.closest('summary')) {
+        setTimeout(() => menu.removeAttribute('open'), 0);
+      }
+    });
   });
 
   function updateStoreUI() {
@@ -4754,6 +4792,20 @@ async function handleProductSelection(item) {
 
   if (mobileFabBackdrop) {
     mobileFabBackdrop.addEventListener('click', closeMobileFab);
+  }
+
+  if (btnFabRequisition) {
+    btnFabRequisition.addEventListener('click', () => {
+      closeMobileFab();
+      btnToggleRequisition?.click();
+    });
+  }
+
+  if (btnFabClear) {
+    btnFabClear.addEventListener('click', () => {
+      closeMobileFab();
+      btnClear?.click();
+    });
   }
 
   if (btnFabSearchList) {

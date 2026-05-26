@@ -4764,3 +4764,41 @@ main.container-fluid,
     max-height: min(48dvh, 340px);
   }
 }
+
+/* === Ajuste UX acciones: visibles vs. agrupadas === */
+.checklist-primary-toolbar {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.toolbar-menu-panel {
+  z-index: 1100;
+}
+
+.toolbar-menu-actions .btn-outline-danger {
+  border-color: #dc3545;
+  color: #dc3545;
+}
+
+.mobile-fab-danger {
+  color: #b42318;
+}
+
+@media (min-width: 768px) {
+  .checklist-primary-toolbar {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  }
+
+  .toolbar-menu-compact .toolbar-menu-toggle {
+    min-width: 112px;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .checklist-primary-toolbar {
+    display: none;
+  }
+
+  .checklist-header-shell {
+    gap: 0.7rem;
+  }
+}
