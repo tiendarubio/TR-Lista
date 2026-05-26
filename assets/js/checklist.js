@@ -305,18 +305,46 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function showAppToast(type, title, message, options = {}) {
-    if (!scanToastHost) return;
+    const safeType = ['success', 'info', 'warning', 'error'].includes(type) ? type : 'info';
+    const timeout = Number(options.timeout || options.timer || 2600);
+    const toastTitle = String(title || '').trim();
+    const toastMessage = String(message || '').trim();
+
+    // Todas las notificaciones visuales de la app pasan por SweetAlert2 Toast.
+    // Los Swal.fire normales se reservan solo para confirmaciones, formularios o validaciones con decisión.
+    if (window.Swal?.mixin) {
+      const Toast = Swal.mixin({
+        toast: true,
+        position: options.position || 'top-end',
+        icon: safeType,
+        showConfirmButton: false,
+        timer: timeout > 0 ? timeout : undefined,
+        timerProgressBar: timeout > 0,
+        customClass: {
+          popup: 'tr-swal-toast'
+        },
+        didOpen: (toast) => {
+          toast.addEventListener('mouseenter', Swal.stopTimer);
+          toast.addEventListener('mouseleave', Swal.resumeTimer);
+        }
+      });
+
+      return Toast.fire({
+        title: toastTitle,
+        text: toastMessage
+      });
+    }
+
+    if (!scanToastHost) return Promise.resolve();
 
     const toast = document.createElement('div');
-    const safeType = ['success', 'info', 'warning', 'error'].includes(type) ? type : 'info';
-    const timeout = Number(options.timeout || 2600);
     toast.className = `scan-toast scan-toast-${safeType}`;
     toast.setAttribute('role', safeType === 'error' ? 'alert' : 'status');
     toast.innerHTML = `
       <span class="scan-toast-icon" aria-hidden="true"><i class="fa-solid ${getToastIcon(safeType)}"></i></span>
       <span class="scan-toast-content">
-        <span class="scan-toast-title">${escapeHtml(title || '')}</span>
-        <span class="scan-toast-message">${escapeHtml(message || '')}</span>
+        <span class="scan-toast-title">${escapeHtml(toastTitle)}</span>
+        <span class="scan-toast-message">${escapeHtml(toastMessage)}</span>
       </span>
       <button type="button" class="scan-toast-close" aria-label="Cerrar aviso"><i class="fa-solid fa-xmark"></i></button>
     `;
@@ -337,6 +365,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (timeout > 0) {
       window.setTimeout(closeToast, timeout);
     }
+
+    return Promise.resolve();
   }
 
   function showScanToast(type, title, message, options = {}) {
@@ -700,7 +730,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function registerWarehouseFcmToken({ silent = false } = {}) {
     if (!canUseWarehouseTools()) return false;
     if (!supportsFirebaseMessaging()) {
-      if (!silent) await Swal.fire('No compatible', 'Este navegador no permite push web con Firebase Cloud Messaging.', 'info');
+      if (!silent) await showScanToast('info', 'No compatible', 'Este navegador no permite push web con Firebase Cloud Messaging.');
       return false;
     }
 
@@ -711,7 +741,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const config = await loadClientConfig();
       const vapidKey = String(config.firebaseVapidKey || '').trim();
       if (!vapidKey) {
-        if (!silent) await Swal.fire('Falta VAPID key', 'La variable VITE_FIREBASE_VAPID_KEY no está disponible desde /api/client-config.', 'warning');
+        if (!silent) await showScanToast('warning', 'Falta VAPID key', 'La variable VITE_FIREBASE_VAPID_KEY no está disponible desde /api/client-config.');
         return false;
       }
 
@@ -725,7 +755,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const idToken = await getCurrentUserIdToken();
       if (!idToken) {
-        if (!silent) await Swal.fire('Sesión requerida', 'No se pudo validar la sesión para registrar notificaciones.', 'warning');
+        if (!silent) await showScanToast('warning', 'Sesión requerida', 'No se pudo validar la sesión para registrar notificaciones.');
         return false;
       }
 
@@ -870,13 +900,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function requestWarehouseBrowserNotifications() {
     if (!supportsBrowserNotifications()) {
-      await Swal.fire('No compatible', 'Este navegador no permite notificaciones del sistema para esta app.', 'info');
+      await showScanToast('info', 'No compatible', 'Este navegador no permite notificaciones del sistema para esta app.');
       updateWarehouseNotificationButton();
       return false;
     }
 
     if (Notification.permission === 'denied') {
-      await Swal.fire('Notificaciones bloqueadas', 'El navegador bloqueó las notificaciones. Debes habilitarlas desde la configuración del sitio o del navegador.', 'info');
+      await showScanToast('info', 'Notificaciones bloqueadas', 'El navegador bloqueó las notificaciones. Debes habilitarlas desde la configuración del sitio o del navegador.');
       updateWarehouseNotificationButton();
       return false;
     }
@@ -1566,7 +1596,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const versionKey = requestLike.versionKey || 'base';
     const requestDate = requestLike.requestDate || getTodayString();
     if (!requestId || !storeKey) {
-      await Swal.fire('Solicitud incompleta', 'No se pudo abrir la solicitud porque falta tienda o identificador.', 'error');
+      await showScanToast('error', 'Solicitud incompleta', 'No se pudo abrir la solicitud porque falta tienda o identificador.');
       return;
     }
 
@@ -1760,11 +1790,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   async function showStoreDeniedAlert(actionLabel = 'usar esta sucursal') {
-    await Swal.fire(
-      'Sucursal restringida',
-      'Tu usuario solo puede ' + actionLabel + ' de ' + getAssignedStoreLabel() + '.',
-      'info'
-    );
+    await showScanToast('info', 'Sucursal restringida', 'Tu usuario solo puede ' + actionLabel + ' de ' + getAssignedStoreLabel() + '.');
   }
 
   async function enforceCurrentStoreAccess(actionLabel = 'usar esta sucursal') {
@@ -1784,11 +1810,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   async function showRoleDeniedAlert(actionLabel = 'usar esta función', allowedLabel = 'usuarios autorizados') {
-    await Swal.fire(
-      'Acceso restringido',
-      'Tu usuario (' + getRoleAccessLabel() + ') no tiene permisos para ' + actionLabel + '. Esta acción está disponible solo para ' + allowedLabel + '.',
-      'info'
-    );
+    await showScanToast('info', 'Acceso restringido', 'Tu usuario (' + getRoleAccessLabel() + ') no tiene permisos para ' + actionLabel + '. Esta acción está disponible solo para ' + allowedLabel + '.');
   }
 
   function restrictOperatorStoreAccess() {
@@ -1988,7 +2010,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     mobileFabMenu.setAttribute('aria-hidden', String(!isOpen));
     mobileFabToggle.setAttribute('aria-expanded', String(isOpen));
     document.body.classList.toggle('mobile-actions-open', isOpen);
-    mobileFabToggle.closest('.mobile-fab-shell')?.classList.toggle('is-open', isOpen);
+    mobileFabMenu.closest('.mobile-fab-shell')?.classList.toggle('is-open', isOpen);
   }
 
   function closeMobileFab() {
@@ -2423,11 +2445,16 @@ function applyListSearchFilter() {
   refreshMobileChecklistCards();
 }
 
-async function openInsertedRowsSearch() {
+async function openInsertedRowsSearch(options = {}) {
   closeMobileFab();
 
   primarySearchMode = 'list';
   updatePrimarySearchModeUI();
+  syncPrimarySearchToListSearch();
+
+  if (options.notify !== false) {
+    await showScanToast('info', 'Buscar en lista', 'Ahora la búsqueda filtra únicamente la tabla ya construida.');
+  }
 
   if (!shouldAvoidAutoFocus()) {
     window.setTimeout(() => {
@@ -2643,10 +2670,11 @@ async function openInsertedRowsSearch() {
       ? ('Esta vista está protegida (' + contexts.join(' + ') + ').')
       : 'Esta vista está protegida.';
 
-    await Swal.fire(
+    await showScanToast(
+      'info',
       'Edición bloqueada',
       'Para ' + actionLabel + ', desbloquea la edición o cambia de vista. ' + contextText,
-      'info'
+      { timeout: 4200 }
     );
   }
 
@@ -2901,11 +2929,7 @@ async function openInsertedRowsSearch() {
 
     const selectedRows = getSelectedTableRows();
     if (!selectedRows.length) {
-      await Swal.fire(
-        'Sin selección',
-        'Selecciona al menos una fila para aplicar esta acción masiva.',
-        'info'
-      );
+      await showScanToast('info', 'Sin selección', 'Selecciona al menos una fila para aplicar esta acción masiva.');
       return;
     }
 
@@ -2926,12 +2950,12 @@ async function openInsertedRowsSearch() {
     if (kind === 'dispatched') updateActiveRequestDispatchVisualStatus();
     if (changedCount) queueAutoSave(kind === 'reviewed' ? 'marcado revisado' : 'marcado despachado');
 
-    await Swal.fire(
+    await showScanToast(
+      changedCount ? 'success' : 'info',
       changedCount ? 'Actualizado' : 'Sin cambios',
       changedCount
         ? ('Se marcaron ' + changedCount + ' fila(s) como ' + actionLabel + '.')
-        : ('Las filas seleccionadas ya estaban ' + actionLabel + '.'),
-      changedCount ? 'success' : 'info'
+        : ('Las filas seleccionadas ya estaban ' + actionLabel + '.')
     );
   }
 
@@ -2948,11 +2972,7 @@ async function openInsertedRowsSearch() {
 
     const selectedRows = getSelectedTableRows();
     if (!selectedRows.length) {
-      await Swal.fire(
-        'Sin selección',
-        'Selecciona al menos una fila para eliminarla de la tabla actual.',
-        'info'
-      );
+      await showScanToast('info', 'Sin selección', 'Selecciona al menos una fila para eliminarla de la tabla actual.');
       return;
     }
 
@@ -2973,11 +2993,7 @@ async function openInsertedRowsSearch() {
     refreshMobileChecklistCards();
     queueAutoSave('eliminar seleccionados');
 
-    await Swal.fire(
-      'Filas eliminadas',
-      'Se eliminaron ' + selectedRows.length + ' fila(s) de la tabla actual.',
-      'success'
-    );
+    await showScanToast('success', 'Filas eliminadas', 'Se eliminaron ' + selectedRows.length + ' fila(s) de la tabla actual.');
   }
 
   function isHistoricalSelectionAvailable() {
@@ -3086,21 +3102,13 @@ async function openInsertedRowsSearch() {
       }
 
       if (!isHistoricalSelectionAvailable()) {
-        await Swal.fire(
-          'No aplica',
-          'Esta acción solo está disponible cuando estás viendo una fecha anterior.',
-          'info'
-        );
+        await showScanToast('info', 'No aplica', 'Esta acción solo está disponible cuando estás viendo una fecha anterior.');
         return;
       }
 
       const selectedRows = getSelectedTableRows();
       if (!selectedRows.length) {
-        await Swal.fire(
-          'Sin selección',
-          'Selecciona al menos un producto histórico para enviarlo a la fecha actual.',
-          'info'
-        );
+        await showScanToast('info', 'Sin selección', 'Selecciona al menos un producto histórico para enviarlo a la fecha actual.');
         return;
       }
 
@@ -3110,11 +3118,7 @@ async function openInsertedRowsSearch() {
       const destinationKeys = getAllDestinationVersionKeys(storeKey);
 
       if (!destinationKeys.length) {
-        await Swal.fire(
-          'Configuración incompleta',
-          'No hay listas destino disponibles para esta tienda.',
-          'error'
-        );
+        await showScanToast('error', 'Configuración incompleta', 'No hay listas destino disponibles para esta tienda.');
         return;
       }
 
@@ -3159,11 +3163,7 @@ async function openInsertedRowsSearch() {
       const today = (typeof getTodayString === 'function') ? getTodayString() : (typeof getTodayString === 'function' ? getTodayString() : '');
 
       if (!toDoc || !today) {
-        await Swal.fire(
-          'Configuración incompleta',
-          'No se encontró la lista destino o la fecha actual.',
-          'error'
-        );
+        await showScanToast('error', 'Configuración incompleta', 'No se encontró la lista destino o la fecha actual.');
         return;
       }
 
@@ -3203,11 +3203,7 @@ async function openInsertedRowsSearch() {
       });
 
       if (!addedItems.length) {
-            await Swal.fire(
-          'Sin cambios',
-          'Todos los productos seleccionados ya existen en la lista de hoy elegida. No se agregó nada.',
-          'info'
-        );
+            await showScanToast('info', 'Sin cambios', 'Todos los productos seleccionados ya existen en la lista de hoy elegida. No se agregó nada.');
         return;
       }
 
@@ -3227,24 +3223,15 @@ async function openInsertedRowsSearch() {
       clearBulkSelection();
       updateBulkSelectionUI();
 
-      await Swal.fire({
-        title: 'Productos enviados',
-        icon: 'success',
-        html: `
-          <div class="text-start small">
-            <div><strong>Destino:</strong> ${escapeHtml(getVersionLabel(toKey))} (${escapeHtml(today)})</div>
-            <div><strong>Agregados:</strong> ${addedItems.length}</div>
-            <div><strong>Omitidos por duplicado:</strong> ${omittedItems.length}</div>
-          </div>
-        `
-      });
+      await showScanToast(
+        'success',
+        'Productos enviados',
+        'Destino: ' + getVersionLabel(toKey) + ' · Agregados: ' + addedItems.length + ' · Omitidos: ' + omittedItems.length,
+        { timeout: 4500 }
+      );
     } catch (err) {
       console.error(err);
-      await Swal.fire(
-        'Error',
-        'No se pudieron enviar los productos seleccionados a la lista de hoy. Intenta nuevamente.',
-        'error'
-      );
+      await showScanToast('error', 'Error', 'No se pudieron enviar los productos seleccionados a la lista de hoy. Intenta nuevamente.');
     }
   }
 
@@ -3706,7 +3693,7 @@ async function openInsertedRowsSearch() {
 
   async function persistCurrentChecklist(options = {}) {
     if (isWarehouseWaitingForRequest()) {
-      await Swal.fire('Sin solicitud abierta', 'Bodega debe abrir una solicitud desde la bandeja antes de guardar cambios.', 'info');
+      await showScanToast('info', 'Sin solicitud abierta', 'Bodega debe abrir una solicitud desde la bandeja antes de guardar cambios.');
       return { ok: false, reason: 'warehouse_no_request' };
     }
 
@@ -3746,7 +3733,7 @@ async function openInsertedRowsSearch() {
       resetAutoSaveBaseline();
 
       if (showSuccess) {
-        await Swal.fire(successTitle, successMessage, successIcon);
+        await showScanToast(successIcon, successTitle, successMessage);
       }
 
       return { ok: true, docId, payload, targetDay };
@@ -3822,7 +3809,7 @@ async function openInsertedRowsSearch() {
       flashAndFocusRow(existingRow, 'dispatch');
 
       if (!changed) {
-        await Swal.fire('Sin cambios', 'Ese producto ya estaba marcado como despachado.', 'info');
+        await showScanToast('info', 'Sin cambios', 'Ese producto ya estaba marcado como despachado.');
         return true;
       }
 
@@ -3836,10 +3823,11 @@ async function openInsertedRowsSearch() {
           setToggleState(dispatchBtn, false);
         }
         flashAndFocusRow(existingRow, 'dispatch');
-        await Swal.fire(
+        await showScanToast(
+          'error',
           'Error',
           'Se marcó el producto en pantalla, pero no se pudo guardar automáticamente. ' + String(e),
-          'error'
+          { timeout: 5200 }
         );
       }
       return true;
@@ -3857,12 +3845,12 @@ async function openInsertedRowsSearch() {
 
 async function handleProductSelection(item) {
     if (isWarehouseWaitingForRequest()) {
-      await Swal.fire('Sin solicitud abierta', 'Abre una solicitud desde la bandeja antes de agregar productos.', 'info');
+      await showScanToast('info', 'Sin solicitud abierta', 'Abre una solicitud desde la bandeja antes de agregar productos.');
       return;
     }
 
     if (isBranchOperator() && !isRequestDraftStatus(requestFlowState?.status)) {
-      await Swal.fire('Lista no iniciada', 'Presiona “Iniciar lista” antes de agregar productos.', 'info');
+      await showScanToast('info', 'Lista no iniciada', 'Presiona “Iniciar lista” antes de agregar productos.');
       return;
     }
 
@@ -3922,11 +3910,7 @@ async function handleProductSelection(item) {
       const destinationKeys = getDestinationVersionKeys(storeKey, fromKey);
 
       if (!destinationKeys.length) {
-        await Swal.fire(
-          'Configuración incompleta',
-          'No hay otra lista disponible como destino para esta tienda.',
-          'error'
-        );
+        await showScanToast('error', 'Configuración incompleta', 'No hay otra lista disponible como destino para esta tienda.');
         return;
       }
 
@@ -3965,11 +3949,7 @@ async function handleProductSelection(item) {
       const toDoc = getBinId(storeKey, toKey);
 
       if (!fromDoc || !toDoc) {
-        await Swal.fire(
-          'Configuración incompleta',
-          'No se encontró el identificador de la lista origen o destino para esta tienda.',
-          'error'
-        );
+        await showScanToast('error', 'Configuración incompleta', 'No se encontró el identificador de la lista origen o destino para esta tienda.');
         return;
       }
 
@@ -3993,11 +3973,7 @@ async function handleProductSelection(item) {
       }
 
       if (findMatchingItemInArray(destRec.items, item)) {
-        await Swal.fire(
-          'Sin cambios',
-          'Ese producto ya existe en la lista destino. No se movió para evitar duplicados.',
-          'info'
-        );
+        await showScanToast('info', 'Sin cambios', 'Ese producto ya existe en la lista destino. No se movió para evitar duplicados.');
         return;
       }
 
@@ -4026,14 +4002,10 @@ async function handleProductSelection(item) {
 
       await refreshHistoryPicker();
 
-      await Swal.fire(
-        'Movimiento realizado',
-        'El producto se movió a la lista ' + getVersionLabel(toKey) + ' de esta tienda.',
-        'success'
-      );
+      await showScanToast('success', 'Movimiento realizado', 'El producto se movió a la lista ' + getVersionLabel(toKey) + ' de esta tienda.');
     } catch (err) {
       console.error(err);
-      await Swal.fire('Error', 'No se pudo mover el producto entre listas. Intenta de nuevo.', 'error');
+      await showScanToast('error', 'Error', 'No se pudo mover el producto entre listas. Intenta de nuevo.');
     }
   }
 
@@ -4475,7 +4447,7 @@ async function handleProductSelection(item) {
     const warehouseNames = getWarehouseNames();
 
     if (!warehouseNames.length) {
-      await Swal.fire('Sin bodegas', 'No se encontraron bodegas disponibles para exportar.', 'info');
+      await showScanToast('info', 'Sin bodegas', 'No se encontraron bodegas disponibles para exportar.');
       return null;
     }
 
@@ -4672,7 +4644,7 @@ async function handleProductSelection(item) {
 
     const fileName = `${sanitizeFilePart(tienda)}_${fechaActual}_${meta.fileSuffixGeneral}.pdf`;
     doc.save(fileName);
-    Swal.fire('Éxito', meta.successGeneral, 'success');
+    showScanToast('success', 'Éxito', meta.successGeneral);
   }
 
   async function exportPDFPorBodega(selectedWarehouses, variant = 'fleteros') {
@@ -4684,7 +4656,7 @@ async function handleProductSelection(item) {
       .map(name => [name, groups[name]]);
 
     if (!selectedGroups.length) {
-      await Swal.fire('Sin datos', 'No hay productos para las bodegas seleccionadas.', 'info');
+      await showScanToast('info', 'Sin datos', 'No hay productos para las bodegas seleccionadas.');
       return;
     }
 
@@ -4707,7 +4679,7 @@ async function handleProductSelection(item) {
         columnStyles: pdfTableConfig.columnStyles
       });
       doc.save(`${sanitizeFilePart(tienda)}_${sanitizeFilePart(bodega)}_${fechaActual}_${meta.fileSuffixWarehouse}.pdf`);
-      await Swal.fire('Éxito', meta.successWarehouse, 'success');
+      await showScanToast('success', 'Éxito', meta.successWarehouse);
       return;
     }
 
@@ -4734,7 +4706,7 @@ async function handleProductSelection(item) {
 
     const content = await zip.generateAsync({ type: 'blob' });
     saveBlobFile(content, `${sanitizeFilePart(tienda)}_PDF_${meta.label.toUpperCase()}_BODEGAS_${fechaActual}.zip`);
-    await Swal.fire('Éxito', meta.successZip, 'success');
+    await showScanToast('success', 'Éxito', meta.successZip);
   }
 
   function buildExcelRows(rowsTr) {
@@ -4781,7 +4753,7 @@ async function handleProductSelection(item) {
       .map(name => [name, groups[name]]);
 
     if (!selectedGroups.length) {
-      await Swal.fire('Sin datos', 'No hay productos para las bodegas seleccionadas.', 'info');
+      await showScanToast('info', 'Sin datos', 'No hay productos para las bodegas seleccionadas.');
       return;
     }
 
@@ -4791,7 +4763,7 @@ async function handleProductSelection(item) {
       const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
       const blob = new Blob([wbout], { type: 'application/octet-stream' });
       saveBlobFile(blob, `${sanitizeFilePart(tienda)}_${sanitizeFilePart(bodega)}_${fechaActual}_Checklist.xlsx`);
-      await Swal.fire('Éxito', 'Se generó el Excel de la bodega seleccionada.', 'success');
+      await showScanToast('success', 'Éxito', 'Se generó el Excel de la bodega seleccionada.');
       return;
     }
 
@@ -4807,7 +4779,7 @@ async function handleProductSelection(item) {
 
     const content = await zip.generateAsync({ type: 'blob' });
     saveBlobFile(content, `${sanitizeFilePart(tienda)}_EXCEL_BODEGAS_${fechaActual}.zip`);
-    await Swal.fire('Éxito', 'Se generó un ZIP con los Excel de las bodegas seleccionadas.', 'success');
+    await showScanToast('success', 'Éxito', 'Se generó un ZIP con los Excel de las bodegas seleccionadas.');
   }
 
   function exportExcelGeneral() {
@@ -4817,12 +4789,12 @@ async function handleProductSelection(item) {
     const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([wbout], { type: 'application/octet-stream' });
     saveBlobFile(blob, `${sanitizeFilePart(tienda)}_${fechaActual}_Checklist_GENERAL.xlsx`);
-    Swal.fire('Éxito', 'Se generó el Excel general.', 'success');
+    showScanToast('success', 'Éxito', 'Se generó el Excel general.');
   }
 
   async function handleExportRequest(preferredFormat = '') {
     if (body.rows.length === 0) {
-      await Swal.fire('Error', 'No hay productos en la lista para exportar.', 'error');
+      await showScanToast('error', 'Error', 'No hay productos en la lista para exportar.');
       return;
     }
 
@@ -4877,7 +4849,7 @@ async function handleProductSelection(item) {
         return;
       }
       if (!canWarehouseEditActiveRequest()) {
-        await Swal.fire('Sin solicitud abierta', 'Abre una solicitud desde la bandeja antes de exportar.', 'info');
+        await showScanToast('info', 'Sin solicitud abierta', 'Abre una solicitud desde la bandeja antes de exportar.');
         return;
       }
       await handleExportRequest();
@@ -4935,9 +4907,14 @@ async function handleProductSelection(item) {
   bindFabProxyClick(btnFabWarehouseNotifications, btnWarehouseNotifications);
 
   if (btnFabSortWarehouse) {
-    btnFabSortWarehouse.addEventListener('click', () => {
+    btnFabSortWarehouse.addEventListener('click', async () => {
       closeMobileFab();
-      sortByBodega({ preserveSelection: true });
+      const result = sortByBodega({ preserveSelection: true });
+      await showScanToast(
+        result.count ? 'success' : 'info',
+        'Lista ordenada',
+        result.count ? ('Orden por bodega aplicado a ' + result.count + ' fila(s).') : 'No hay productos para ordenar.'
+      );
     });
   }
 
@@ -4959,7 +4936,7 @@ async function handleProductSelection(item) {
         return;
       }
       if (!canWarehouseEditActiveRequest()) {
-        await Swal.fire('Sin solicitud abierta', 'Abre una solicitud desde la bandeja antes de exportar.', 'info');
+        await showScanToast('info', 'Sin solicitud abierta', 'Abre una solicitud desde la bandeja antes de exportar.');
         return;
       }
       await handleExportRequest();
@@ -4967,9 +4944,10 @@ async function handleProductSelection(item) {
   }
 
   if (btnFabScrollTop) {
-    btnFabScrollTop.addEventListener('click', () => {
+    btnFabScrollTop.addEventListener('click', async () => {
       closeMobileFab();
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      await showScanToast('info', 'Ir arriba', 'Volviendo al inicio de la pantalla.');
     });
   }
 
@@ -4980,9 +4958,7 @@ async function handleProductSelection(item) {
   });
 
   window.addEventListener('resize', () => {
-    if (!isCompactScreen()) {
-      closeMobileFab();
-    }
+    // El panel de acciones se usa también en PC; no se cierra automáticamente al cambiar de ancho.
   });
 
 
@@ -5028,51 +5004,70 @@ async function handleProductSelection(item) {
       direction: sortAsc ? 'desc' : 'asc'
     };
   }
-  thBodega.addEventListener('click', () => sortByBodega({ preserveSelection: true }));
+  thBodega.addEventListener('click', async () => {
+    const result = sortByBodega({ preserveSelection: true });
+    await showScanToast(
+      result.count ? 'success' : 'info',
+      'Lista ordenada',
+      result.count ? ('Orden por bodega aplicado a ' + result.count + ' fila(s).') : 'No hay productos para ordenar.'
+    );
+  });
 
   // Clear & persist empty (solo hoy)
   btnClear.addEventListener('click', async () => {
+    closeMobileFab();
+    closeMoreActionsMenu();
+
     if (isEditingLocked()) {
       await showEditingLockedAlert('limpiar la lista');
       return;
     }
 
-    if (body.rows.length === 0) return;
+    if (body.rows.length === 0) {
+      await showScanToast('info', 'Lista vacía', 'No hay productos para limpiar.');
+      return;
+    }
 
     const targetDay = getTargetChecklistDate();
+    const itemCount = body.rows.length;
 
-    Swal.fire({
-      title: '¿Limpiar checklist?',
-      text: 'Se eliminarán todos los items en pantalla y se guardará la fecha seleccionada vacía.',
+    const res = await Swal.fire({
+      title: '¿Limpiar todo?',
+      html: '<div class="text-start small">Se eliminarán <strong>' + itemCount + '</strong> item(s) en pantalla y se guardará la fecha seleccionada vacía.<br><br>Esta acción requiere confirmación.</div>',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonText: 'Limpiar'
-    }).then(async res => {
-      if (res.isConfirmed) {
-        await withLoading('Limpiando checklist...', async () => {
-          body.innerHTML = '';
-          renumber();
-          updateBulkSelectionUI();
-          applyListSearchFilter();
-
-          const docId = getDocIdForCurrentList();
-          const payload = collectPayload();
-
-          await saveChecklistToFirestore(docId, payload, targetDay);
-          rememberHistoryDate(docId, targetDay);
-          if (activeWarehouseRequest) await syncActiveWarehouseRequest();
-          lastUpdateISO = payload.meta.updatedAt;
-          lastSaved.innerHTML =
-            '<i class="fa-solid fa-clock-rotate-left me-1"></i>' +
-            'Última actualización: ' +
-            formatSV(lastUpdateISO);
-
-          await refreshHistoryPicker();
-        });
-
-        Swal.fire('Listo', 'Checklist guardado vacío correctamente.', 'success');
-      }
+      confirmButtonText: 'Sí, limpiar todo',
+      cancelButtonText: 'Cancelar',
+      reverseButtons: true
     });
+
+    if (!res.isConfirmed) {
+      await showScanToast('info', 'Acción cancelada', 'No se limpió la lista.');
+      return;
+    }
+
+    await withLoading('Limpiando checklist...', async () => {
+      body.innerHTML = '';
+      renumber();
+      updateBulkSelectionUI();
+      applyListSearchFilter();
+
+      const docId = getDocIdForCurrentList();
+      const payload = collectPayload();
+
+      await saveChecklistToFirestore(docId, payload, targetDay);
+      rememberHistoryDate(docId, targetDay);
+      if (activeWarehouseRequest) await syncActiveWarehouseRequest();
+      lastUpdateISO = payload.meta.updatedAt;
+      lastSaved.innerHTML =
+        '<i class="fa-solid fa-clock-rotate-left me-1"></i>' +
+        'Última actualización: ' +
+        formatSV(lastUpdateISO);
+
+      await refreshHistoryPicker();
+    });
+
+    await showScanToast('success', 'Lista limpiada', 'Se eliminaron ' + itemCount + ' item(s) y se guardó el checklist vacío.');
   });
 
   btnSave.addEventListener('click', async () => {
@@ -5080,7 +5075,7 @@ async function handleProductSelection(item) {
     try {
       await persistCurrentChecklist();
     } catch (e) {
-      Swal.fire('Error', String(e), 'error');
+      showScanToast('error', 'Error', String(e));
     }
   });
 
@@ -5115,7 +5110,7 @@ async function handleProductSelection(item) {
         requisitionDone = prevDone;
         requisitionDoneAt = prevDoneAt;
         updateRequisitionUI();
-        await Swal.fire('Error', String(e), 'error');
+        await showScanToast('error', 'Error', String(e));
       }
     });
   }
@@ -5483,11 +5478,15 @@ async function handleProductSelection(item) {
 
   async function closeWarehouseRequest(options = {}) {
     if (!requiresWarehouseRequestContext()) return;
-    if (activeWarehouseRequest?.requestId && options.confirm !== false) {
+    const hadActiveRequest = !!activeWarehouseRequest?.requestId;
+    if (hadActiveRequest && options.confirm !== false) {
       const canLeave = await confirmLeaveActiveWarehouseRequest('cerrar esta solicitud');
       if (!canLeave) return;
     }
     prepareWarehouseWorkspace();
+    if (hadActiveRequest && options.notify !== false) {
+      await showScanToast('info', 'Solicitud cerrada', 'El espacio de bodega quedó listo para abrir otra solicitud.');
+    }
   }
 
   async function refreshHistoryPicker() {
@@ -5551,13 +5550,8 @@ async function handleProductSelection(item) {
 
     if (requiresWarehouseRequestContext()) {
       if (activeWarehouseRequest?.requestId) {
-        const result = await Swal.fire({
-          title: 'Solicitud activa',
-          text: 'Cierra la solicitud activa antes de cambiar el filtro de fecha.',
-          icon: 'info',
-          confirmButtonText: 'Entendido'
-        });
-        return result;
+        await showScanToast('info', 'Solicitud activa', 'Cierra la solicitud activa antes de cambiar el filtro de fecha.', { timeout: 3600 });
+        return false;
       }
       currentViewDate = dateStr;
       const histModeText = document.getElementById('histViewModeText');
@@ -5613,7 +5607,7 @@ async function handleProductSelection(item) {
         } else {
           lastUpdateISO = record?.meta?.updatedAt || null;
           lastSaved.innerHTML = '<i class="fa-solid fa-clock-rotate-left me-1"></i>' + 'Sin guardado para esa fecha.';
-          Swal.fire('Sin datos', 'No hay checklist guardado para esa fecha.', 'info');
+          showScanToast('info', 'Sin datos', 'No hay checklist guardado para esa fecha.');
         }
 
         const isHistorical = (today ? (dateStr !== today) : true);
@@ -5621,7 +5615,7 @@ async function handleProductSelection(item) {
         applyListSearchFilter();
       } catch (e) {
         console.error('Error al cargar histórico:', e);
-        Swal.fire('Error', 'No se pudo cargar el histórico para esa fecha.', 'error');
+        showScanToast('error', 'Error', 'No se pudo cargar el histórico para esa fecha.');
       }
     });
   }
@@ -5665,11 +5659,7 @@ async function handleProductSelection(item) {
       const canUnlockAny = canUnlockHistorical || canUnlockProtected;
 
       if (!canUnlockAny) {
-        await Swal.fire(
-          'No aplica',
-          'Este botón solo se usa cuando estás viendo una fecha anterior o una lista protegida.',
-          'info'
-        );
+        await showScanToast('info', 'No aplica', 'Este botón solo se usa cuando estás viendo una fecha anterior o una lista protegida.');
         return;
       }
 
@@ -5689,11 +5679,7 @@ async function handleProductSelection(item) {
         protectedVersionUnlockEnabled = false;
         setHistoricalViewMode(isHistoricalDateSelected());
 
-        await Swal.fire(
-          'Bloqueado',
-          'Los controles protegidos fueron bloqueados nuevamente.',
-          'success'
-        );
+        await showScanToast('success', 'Bloqueado', 'Los controles protegidos fueron bloqueados nuevamente.');
         return;
       }
 
@@ -5712,11 +5698,7 @@ async function handleProductSelection(item) {
         protectedVersionUnlockEnabled = canUnlockProtected;
         setHistoricalViewMode(isHistoricalDateSelected());
 
-        await Swal.fire(
-          'Desbloqueado',
-          'Ya puedes editar esta vista hasta que vuelvas a bloquearla.',
-          'success'
-        );
+        await showScanToast('success', 'Desbloqueado', 'Ya puedes editar esta vista hasta que vuelvas a bloquearla.');
       }
     });
   }
@@ -5946,7 +5928,7 @@ async function handleProductSelection(item) {
     } catch (err) {
       console.error('BarcodeDetector scanner error:', err);
       await stopScanner();
-      Swal.fire('Cámara no disponible', 'No se pudo iniciar BarcodeDetector. Puedes ingresar el código manualmente.', 'info')
+      showScanToast('info', 'Cámara no disponible', 'No se pudo iniciar BarcodeDetector. Puedes ingresar el código manualmente.')
         .then(() => askForManualBarcodeEntry());
     }
   }
@@ -5996,7 +5978,7 @@ async function handleProductSelection(item) {
     } catch (err) {
       console.error('html5-qrcode scanner error:', err);
       await stopScanner();
-      Swal.fire('Cámara no disponible', 'No se pudo iniciar el escáner en este dispositivo. Puedes ingresar el código manualmente.', 'info')
+      showScanToast('info', 'Cámara no disponible', 'No se pudo iniciar el escáner en este dispositivo. Puedes ingresar el código manualmente.')
         .then(() => askForManualBarcodeEntry());
     }
   }
@@ -6097,7 +6079,7 @@ async function handleProductSelection(item) {
       return;
     }
     if (!canWarehouseEditActiveRequest()) {
-      await Swal.fire('Sin solicitud abierta', 'Abre una solicitud desde la bandeja antes de limpiar no revisados.', 'info');
+      await showScanToast('info', 'Sin solicitud abierta', 'Abre una solicitud desde la bandeja antes de limpiar no revisados.');
       return;
     }
     if (isEditingLocked()) {
@@ -6107,7 +6089,7 @@ async function handleProductSelection(item) {
     const rows = [...body.getElementsByTagName('tr')];
     const toRemove = rows.filter(tr => !getReviewButton(tr)?.classList.contains('on'));
     if (!toRemove.length) {
-      await Swal.fire('Lista limpia', 'No hay productos sin revisar para eliminar.', 'info');
+      await showScanToast('info', 'Lista limpia', 'No hay productos sin revisar para eliminar.');
       return;
     }
     const result = await Swal.fire({
@@ -6133,7 +6115,7 @@ async function handleProductSelection(item) {
   async function markActiveRequestDispatched() {
     if (!canUseWarehouseTools()) return;
     if (!activeWarehouseRequest?.requestId) {
-      await Swal.fire('Sin solicitud abierta', 'Abre una solicitud desde la bandeja antes de marcarla como despachada.', 'info');
+      await showScanToast('info', 'Sin solicitud abierta', 'Abre una solicitud desde la bandeja antes de marcarla como despachada.');
       return;
     }
     const rows = [...body.getElementsByTagName('tr')];
@@ -6161,14 +6143,14 @@ async function handleProductSelection(item) {
     });
     await syncActiveWarehouseRequest(REQUEST_STATUSES.DISPATCHED);
     updateRequestFlowUI();
-    await Swal.fire('Solicitud despachada', 'La solicitud quedó marcada como despachada.', 'success');
+    await showScanToast('success', 'Solicitud despachada', 'La solicitud quedó marcada como despachada.');
   }
 
 
   async function cancelActiveWarehouseRequest() {
     if (!canUseWarehouseTools()) return;
     if (!activeWarehouseRequest?.requestId) {
-      await Swal.fire('Sin solicitud abierta', 'Abre una solicitud desde la bandeja antes de cancelarla.', 'info');
+      await showScanToast('info', 'Sin solicitud abierta', 'Abre una solicitud desde la bandeja antes de cancelarla.');
       return;
     }
     const result = await Swal.fire({
@@ -6193,7 +6175,7 @@ async function handleProductSelection(item) {
     });
     await syncActiveWarehouseRequest(REQUEST_STATUSES.CANCELLED);
     updateRequestFlowUI();
-    await Swal.fire('Solicitud cancelada', 'La solicitud quedó cancelada y conservada en el historial.', 'success');
+    await showScanToast('success', 'Solicitud cancelada', 'La solicitud quedó cancelada y conservada en el historial.');
   }
 
 
@@ -6490,13 +6472,13 @@ async function handleProductSelection(item) {
       updateRequestFlowUI();
       showScanToast('success', 'Solicitudes fusionadas', mergeResult.sourceCount + ' solicitud(es) incorporada(s). Items destino: ' + mergeResult.itemCount + '.', { timeout: 4500 });
       const friendlyDestination = getFriendlyRequestCode({ requestId: mergeResult.destinationId, id: mergeResult.destinationId });
-      await Swal.fire('Solicitudes fusionadas', 'Se fusionaron ' + mergeResult.sourceCount + ' solicitud(es) con ' + friendlyDestination + '.', 'success');
+      await showScanToast('success', 'Solicitudes fusionadas', 'Se fusionaron ' + mergeResult.sourceCount + ' solicitud(es) con ' + friendlyDestination + '.');
     });
   }
 
   if (btnCleanUnreviewed) {
     btnCleanUnreviewed.addEventListener('click', async () => {
-      try { await cleanUnreviewedRows(); } catch (err) { await Swal.fire('Error', String(err?.message || err), 'error'); }
+      try { await cleanUnreviewedRows(); } catch (err) { await showScanToast('error', 'Error', String(err?.message || err)); }
     });
   }
 
@@ -6508,7 +6490,7 @@ async function handleProductSelection(item) {
 
     const status = normalizeRequestStatus(requestFlowState?.status || REQUEST_STATUSES.NONE);
     if (isRequestSentStatus(status)) {
-      await Swal.fire('Solicitud ya enviada', 'Esta sucursal ya envió una solicitud hoy. Mañana podrás iniciar una nueva.', 'info');
+      await showScanToast('info', 'Solicitud ya enviada', 'Esta sucursal ya envió una solicitud hoy. Mañana podrás iniciar una nueva.');
       return;
     }
     if (isRequestDraftStatus(status)) return;
@@ -6538,7 +6520,7 @@ async function handleProductSelection(item) {
     const status = normalizeRequestStatus(requestLike?.status || requestFlowState?.status || REQUEST_STATUSES.NONE);
     const requestId = requestLike?.requestId || requestLike?.id || requestFlowState?.requestId;
     if (status !== REQUEST_STATUSES.DISPATCHED || !requestId) {
-      await Swal.fire('No disponible', 'Solo puedes confirmar recibido cuando bodega ya marcó la solicitud como despachada.', 'info');
+      await showScanToast('info', 'No disponible', 'Solo puedes confirmar recibido cuando bodega ya marcó la solicitud como despachada.');
       return;
     }
     if (!options?.skipPrompt) {
@@ -6693,13 +6675,13 @@ async function handleProductSelection(item) {
     if (!(await enforceCurrentStoreAccess('enviar solicitud'))) return;
 
     if (!isRequestDraftStatus(requestFlowState?.status)) {
-      await Swal.fire('Lista no disponible', 'Primero debes iniciar una lista para poder enviarla.', 'info');
+      await showScanToast('info', 'Lista no disponible', 'Primero debes iniciar una lista para poder enviarla.');
       return;
     }
 
     const items = [...body.getElementsByTagName('tr')].map(buildChecklistItemFromRow);
     if (!items.length) {
-      await Swal.fire('Lista vacía', 'Agrega al menos un producto antes de finalizar y enviar.', 'info');
+      await showScanToast('info', 'Lista vacía', 'Agrega al menos un producto antes de finalizar y enviar.');
       return;
     }
 
@@ -6755,24 +6737,24 @@ async function handleProductSelection(item) {
       updateRequestFlowUI();
     });
 
-    await Swal.fire('Solicitud enviada', 'La lista quedó enviada a bodega y bloqueada para la sucursal.', 'success');
+    await showScanToast('success', 'Solicitud enviada', 'La lista quedó enviada a bodega y bloqueada para la sucursal.');
   }
 
   if (btnStartList) {
     btnStartList.addEventListener('click', async () => {
-      try { await startBranchList(); } catch (err) { await Swal.fire('Error', String(err?.message || err), 'error'); }
+      try { await startBranchList(); } catch (err) { await showScanToast('error', 'Error', String(err?.message || err)); }
     });
   }
 
   if (btnSubmitRequest) {
     btnSubmitRequest.addEventListener('click', async () => {
-      try { await submitBranchRequest(); } catch (err) { await Swal.fire('Error', String(err?.message || err), 'error'); }
+      try { await submitBranchRequest(); } catch (err) { await showScanToast('error', 'Error', String(err?.message || err)); }
     });
   }
 
   if (btnConfirmRequestReceived) {
     btnConfirmRequestReceived.addEventListener('click', async () => {
-      try { await confirmBranchRequestReceived(); } catch (err) { await Swal.fire('Error', String(err?.message || err), 'error'); }
+      try { await confirmBranchRequestReceived(); } catch (err) { await showScanToast('error', 'Error', String(err?.message || err)); }
     });
   }
 
@@ -6784,50 +6766,50 @@ async function handleProductSelection(item) {
 
   if (btnViewRequestHistory) {
     btnViewRequestHistory.addEventListener('click', async () => {
-      try { await openRequestsList({ title: 'Mis solicitudes' }); } catch (err) { await Swal.fire('Error', String(err?.message || err), 'error'); }
+      try { await openRequestsList({ title: 'Mis solicitudes' }); } catch (err) { await showScanToast('error', 'Error', String(err?.message || err)); }
     });
   }
 
   if (btnWarehouseNotifications) {
     btnWarehouseNotifications.addEventListener('click', async () => {
-      try { await requestWarehouseBrowserNotifications(); } catch (err) { await Swal.fire('Error', String(err?.message || err), 'error'); }
+      try { await requestWarehouseBrowserNotifications(); } catch (err) { await showScanToast('error', 'Error', String(err?.message || err)); }
     });
   }
 
   if (btnCreateWarehouseRequest) {
     btnCreateWarehouseRequest.addEventListener('click', async () => {
-      try { await createWarehouseRequest(); } catch (err) { await Swal.fire('Error', String(err?.message || err), 'error'); }
+      try { await createWarehouseRequest(); } catch (err) { await showScanToast('error', 'Error', String(err?.message || err)); }
     });
   }
 
   if (btnWarehouseInbox) {
     btnWarehouseInbox.addEventListener('click', async () => {
-      try { await openRequestsList({ title: 'Solicitudes recibidas' }); } catch (err) { await Swal.fire('Error', String(err?.message || err), 'error'); }
+      try { await openRequestsList({ title: 'Solicitudes recibidas' }); } catch (err) { await showScanToast('error', 'Error', String(err?.message || err)); }
     });
   }
 
   if (btnCloseWarehouseRequest) {
     btnCloseWarehouseRequest.addEventListener('click', async () => {
-      try { await closeWarehouseRequest(); } catch (err) { await Swal.fire('Error', String(err?.message || err), 'error'); }
+      try { await closeWarehouseRequest(); } catch (err) { await showScanToast('error', 'Error', String(err?.message || err)); }
     });
   }
 
   if (btnMarkRequestDispatched) {
     btnMarkRequestDispatched.addEventListener('click', async () => {
-      try { await markActiveRequestDispatched(); } catch (err) { await Swal.fire('Error', String(err?.message || err), 'error'); }
+      try { await markActiveRequestDispatched(); } catch (err) { await showScanToast('error', 'Error', String(err?.message || err)); }
     });
   }
 
 
   if (btnCancelWarehouseRequest) {
     btnCancelWarehouseRequest.addEventListener('click', async () => {
-      try { await cancelActiveWarehouseRequest(); } catch (err) { await Swal.fire('Error', String(err?.message || err), 'error'); }
+      try { await cancelActiveWarehouseRequest(); } catch (err) { await showScanToast('error', 'Error', String(err?.message || err)); }
     });
   }
 
   if (btnMergeWarehouseRequests) {
     btnMergeWarehouseRequests.addEventListener('click', async () => {
-      try { await openMergeRequestsDialog(); } catch (err) { await Swal.fire('Error', String(err?.message || err), 'error'); }
+      try { await openMergeRequestsDialog(); } catch (err) { await showScanToast('error', 'Error', String(err?.message || err)); }
     });
   }
 
