@@ -63,6 +63,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const mobileFabToggle = $('mobileFabToggle');
   const mobileFabMenu = $('mobileFabMenu');
   const mobileFabBackdrop = $('mobileFabBackdrop');
+  const mobileFabClose = $('mobileFabClose');
   const btnFabSave = $('btnFabSave');
   const btnFabSearchList = $('btnFabSearchList');
   const btnFabSortWarehouse = $('btnFabSortWarehouse');
@@ -1980,10 +1981,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   function setMobileFabOpen(shouldOpen) {
     if (!mobileFabToggle || !mobileFabMenu || !mobileFabBackdrop) return;
     const isOpen = !!shouldOpen;
+    if (isOpen && suggestions) suggestions.innerHTML = '';
+    if (isOpen && document.activeElement === searchInput) searchInput.blur();
     mobileFabMenu.classList.toggle('d-none', !isOpen);
     mobileFabBackdrop.classList.toggle('d-none', !isOpen);
     mobileFabMenu.setAttribute('aria-hidden', String(!isOpen));
     mobileFabToggle.setAttribute('aria-expanded', String(isOpen));
+    document.body.classList.toggle('mobile-actions-open', isOpen);
     mobileFabToggle.closest('.mobile-fab-shell')?.classList.toggle('is-open', isOpen);
   }
 
@@ -4889,6 +4893,10 @@ async function handleProductSelection(item) {
 
   if (mobileFabBackdrop) {
     mobileFabBackdrop.addEventListener('click', closeMobileFab);
+  }
+
+  if (mobileFabClose) {
+    mobileFabClose.addEventListener('click', closeMobileFab);
   }
 
   if (btnFabRequisition) {

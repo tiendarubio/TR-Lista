@@ -363,6 +363,10 @@
                 <div class="search-mode-meta-row">
                   <span id="searchModeHint" class="search-mode-hint">Modo: catálogo</span>
                   <span id="listSearchCount" class="list-search-count">0 / 0</span>
+                  <button type="button" id="mobileFabToggle" class="btn btn-outline-primary btn-sm mobile-actions-toggle d-md-none" aria-expanded="false" aria-controls="mobileFabMenu" aria-label="Abrir panel de acciones">
+                    <i class="fa-solid fa-bars-staggered" aria-hidden="true"></i>
+                    <span>Acciones</span>
+                  </button>
                 </div>
 
                 <div id="scanWrap" class="scanner-wrap scan-panel">
@@ -460,10 +464,15 @@
 
 
   <div id="mobileFabBackdrop" class="mobile-fab-backdrop d-none" aria-hidden="true"></div>
-  <div class="mobile-fab-shell d-md-none" aria-label="Acciones rápidas">
-    <div id="mobileFabMenu" class="mobile-fab-menu d-none" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Acciones rápidas">
+  <div class="mobile-fab-shell d-md-none" aria-label="Panel de acciones">
+    <div id="mobileFabMenu" class="mobile-fab-menu mobile-actions-sidebar d-none" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Panel de acciones">
       <div class="mobile-fab-sheet-handle" aria-hidden="true"></div>
-      <div class="mobile-fab-sheet-title">Acciones rápidas</div>
+      <div class="mobile-fab-sheet-title">
+        <span>Acciones</span>
+        <button type="button" id="mobileFabClose" class="mobile-sidebar-close" aria-label="Cerrar panel de acciones">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
 
       <div id="mobileFabRequestSectionTitle" class="mobile-fab-section-title d-none">Solicitud activa</div>
       <button type="button" id="btnFabCloseRequest" class="btn btn-light mobile-fab-menu-btn d-none">
@@ -521,9 +530,6 @@
         <span>Limpiar todo</span>
       </button>
     </div>
-    <button type="button" id="mobileFabToggle" class="btn btn-primary mobile-fab-toggle" aria-expanded="false" aria-controls="mobileFabMenu" aria-label="Abrir acciones rápidas">
-      <i class="fa-solid fa-plus" aria-hidden="true"></i>
-    </button>
   </div>
 
   <div id="authGate" class="auth-gate" aria-hidden="false">
