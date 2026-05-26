@@ -5604,7 +5604,7 @@ body.mobile-actions-open {
   }
 }
 
-/* === v20 ajuste: barra contextual de selección con menú Más === */
+/* === v20+: barra contextual directa + botón de detener escáner sin texto === */
 .bulk-selection-bar,
 #bulkSelectionBar {
   overflow: visible !important;
@@ -5616,148 +5616,150 @@ body.mobile-actions-open {
 }
 
 .bulk-selection-bar.d-none,
-#bulkSelectionBar.d-none {
+#bulkSelectionBar.d-none,
+#bulkSelectionBar[hidden] {
   display: none !important;
 }
 
-.bulk-selection-summary {
+.bulk-selection-summary,
+#bulkSelectionBar .bulk-selection-summary {
   grid-area: summary !important;
   min-width: 0 !important;
 }
 
-.bulk-selection-actions {
+.bulk-selection-actions,
+#bulkSelectionBar .bulk-selection-actions {
   grid-area: actions !important;
   min-width: 0 !important;
 }
 
-.bulk-selection-more-menu {
-  position: absolute !important;
-  right: 0.75rem !important;
-  bottom: calc(100% + 0.55rem) !important;
-  width: min(19rem, calc(100vw - 1.5rem)) !important;
-  padding: 0.45rem !important;
-  border: 1px solid rgba(148, 163, 184, 0.35) !important;
-  border-radius: 1rem !important;
-  background: rgba(255, 255, 255, 0.98) !important;
-  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18) !important;
-  z-index: 3340 !important;
-}
-
-.bulk-selection-more-menu.d-none {
-  display: none !important;
-}
-
-.bulk-selection-more-item {
-  width: 100% !important;
-  min-height: 42px !important;
-  border: 0 !important;
-  border-radius: 0.8rem !important;
-  background: transparent !important;
-  color: #1f2937 !important;
-  display: flex !important;
+#bulkSelectionBar .bulk-selection-actions {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
   align-items: center !important;
-  gap: 0.65rem !important;
-  padding: 0.55rem 0.75rem !important;
+  gap: 0.32rem !important;
+  overflow: visible !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+#bulkSelectionBar .bulk-selection-actions > .btn {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  min-height: 38px !important;
+  padding: 0.42rem 0.42rem !important;
+  border-radius: 0.85rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.28rem !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  font-size: 0.78rem !important;
   font-weight: 700 !important;
-  text-align: left !important;
 }
 
-.bulk-selection-more-item:hover,
-.bulk-selection-more-item:focus-visible {
-  background: rgba(15, 23, 42, 0.06) !important;
-  outline: none !important;
+#bulkSelectionBar .bulk-selection-actions > .btn i {
+  flex: 0 0 auto !important;
 }
 
-.bulk-selection-more-item.text-danger {
-  color: #b91c1c !important;
+#bulkSelectionBar .bulk-selection-actions > .btn span {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  display: inline !important;
 }
 
-.bulk-selection-more-item:disabled,
-.bulk-selection-more-item[aria-disabled="true"] {
-  opacity: 0.55 !important;
-  pointer-events: none !important;
+.search-bar-embedded #btnScan.scanner-stop-btn,
+#btnScan.scanner-stop-btn {
+  background-color: #dc3545 !important;
+  border-color: #dc3545 !important;
+  color: #fff !important;
+  box-shadow: 0 0 0 0.16rem rgba(220, 53, 69, 0.18) !important;
+}
+
+.search-bar-embedded #btnScan.scanner-stop-btn:hover,
+.search-bar-embedded #btnScan.scanner-stop-btn:focus-visible,
+#btnScan.scanner-stop-btn:hover,
+#btnScan.scanner-stop-btn:focus-visible {
+  background-color: #bb2d3b !important;
+  border-color: #b02a37 !important;
+  color: #fff !important;
+}
+
+.search-bar-embedded #btnScan.scanner-stop-btn i,
+#btnScan.scanner-stop-btn i {
+  margin: 0 !important;
+  font-size: 1rem !important;
+  line-height: 1 !important;
 }
 
 @media (max-width: 767.98px) {
-  .bulk-selection-bar,
-  #bulkSelectionBar {
-    left: max(0.5rem, env(safe-area-inset-left)) !important;
-    right: max(0.5rem, env(safe-area-inset-right)) !important;
-    bottom: calc(max(0.55rem, env(safe-area-inset-bottom)) + 0.05rem) !important;
-    padding: 0.43rem 0.5rem !important;
+  body.has-mobile-selection #mobileFabToggle.mobile-actions-toggle {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateY(8px) !important;
+  }
+
+  #bulkSelectionBar.bulk-selection-bar {
+    position: fixed !important;
+    left: max(0.55rem, env(safe-area-inset-left)) !important;
+    right: max(0.55rem, env(safe-area-inset-right)) !important;
+    bottom: calc(max(0.55rem, env(safe-area-inset-bottom)) + 0.1rem) !important;
+    top: auto !important;
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0.45rem 0.5rem !important;
+    border-radius: 1rem !important;
+    display: grid !important;
     grid-template-columns: auto minmax(0, 1fr) !important;
     grid-template-areas: "summary actions" !important;
-    gap: 0.42rem !important;
-    border-radius: 1rem !important;
-    max-height: none !important;
-  }
-
-  .bulk-selection-count-pill {
-    max-width: 5.7rem !important;
-    min-height: 38px !important;
-    padding: 0.44rem 0.58rem !important;
-    font-size: 0.86rem !important;
-  }
-
-  .bulk-selection-actions {
-    display: flex !important;
     align-items: center !important;
-    gap: 0.35rem !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    -webkit-overflow-scrolling: touch !important;
-    scrollbar-width: none !important;
-    padding: 0.03rem 0 !important;
+    gap: 0.42rem !important;
+    overflow: visible !important;
+    z-index: 3320 !important;
+    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.16) !important;
   }
 
-  .bulk-selection-actions::-webkit-scrollbar {
-    display: none !important;
-  }
-
-  .bulk-selection-actions > .btn,
-  .bulk-selection-more-toggle {
-    flex: 0 0 auto !important;
+  #bulkSelectionBar .bulk-selection-count-pill {
+    width: auto !important;
+    max-width: 4.9rem !important;
     min-height: 38px !important;
-    min-width: max-content !important;
-    padding: 0.42rem 0.62rem !important;
-    border-radius: 0.85rem !important;
-    gap: 0.32rem !important;
+    padding: 0.44rem 0.55rem !important;
     white-space: nowrap !important;
-    font-weight: 700 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 0.84rem !important;
   }
 
-  .bulk-selection-more-menu {
-    right: 0.2rem !important;
-    width: min(18rem, calc(100vw - 1rem)) !important;
-    bottom: calc(100% + 0.45rem) !important;
+  #bulkSelectionBar .bulk-selection-actions {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+
+  #bulkSelectionBar .bulk-selection-actions > .btn {
+    padding-inline: 0.34rem !important;
   }
 
   body.has-mobile-selection .mobile-checklist-cards,
-  body.has-mobile-selection .table-checklist-shell,
-  .mobile-checklist-cards,
-  .table-checklist-shell {
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4.6rem) !important;
+  body.has-mobile-selection .table-checklist-shell {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4.9rem) !important;
   }
 
   body.has-mobile-selection {
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4.6rem) !important;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4.9rem) !important;
   }
 }
 
-@media (max-width: 380px) {
-  .bulk-selection-count-pill {
-    max-width: 4.85rem !important;
-    padding-inline: 0.5rem !important;
+@media (max-width: 420px) {
+  #bulkSelectionBar .bulk-selection-actions > .btn span {
+    display: none !important;
   }
 
-  .bulk-selection-actions > .btn,
-  .bulk-selection-more-toggle {
-    min-width: 38px !important;
-    padding-inline: 0.55rem !important;
-  }
-
-  .bulk-selection-actions > .btn span,
-  .bulk-selection-more-toggle span {
-    display: inline !important;
+  #bulkSelectionBar .bulk-selection-actions > .btn i {
+    font-size: 0.95rem !important;
   }
 }
