@@ -3388,36 +3388,6 @@ main.container-fluid {
   margin-top: 0.62rem;
 }
 
-.mobile-card-qty-btn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.55rem;
-  min-height: 40px;
-  padding: 0.45rem 0.62rem;
-  border: 1px solid #d9e1ea;
-  border-radius: 0.8rem;
-  background: #fff;
-  text-align: left;
-}
-
-.mobile-card-qty-btn .qty-label {
-  font-size: 0.74rem;
-  font-weight: 700;
-  color: #6b7280;
-  text-transform: uppercase;
-}
-
-.mobile-card-qty-btn .qty-value {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-size: 0.84rem;
-  color: #17202f;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
 .mobile-card-actions {
   display: flex;
@@ -4847,3 +4817,20 @@ main.container-fluid,
   }
 }
 
+
+
+/* === Revisión buscador/escáner: capa final para scroll real de sugerencias === */
+.search-suggestions {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+  touch-action: pan-y !important;
+}
+
+@media (max-width: 767.98px) {
+  .search-suggestions {
+    max-height: min(50svh, 360px) !important;
+    z-index: 2145 !important;
+  }
+}

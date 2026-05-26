@@ -29,7 +29,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Permite que la lista desplegable del buscador tenga scroll propio en móvil.
   // No usamos preventDefault: así el navegador conserva el scroll natural de la lista.
   if (suggestions) {
-    ['touchstart', 'touchmove', 'wheel'].forEach(eventName => {
+    suggestions.setAttribute('role', 'listbox');
+    if (searchInput) {
+      searchInput.setAttribute('role', 'combobox');
+      searchInput.setAttribute('aria-autocomplete', 'list');
+      searchInput.setAttribute('aria-controls', 'suggestions');
+    }
+    ['pointerdown', 'pointermove', 'touchstart', 'touchmove', 'wheel'].forEach(eventName => {
       suggestions.addEventListener(eventName, event => {
         event.stopPropagation();
       }, { passive: true });
@@ -376,18 +382,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       .filter(entry => entry.searchText.includes(q))
       .slice(0, 40);
 
+    suggestions.setAttribute('role', 'listbox');
+
     if (!matches.length) {
       const li = document.createElement('li');
       li.className = 'list-group-item text-muted small';
+      li.setAttribute('role', 'option');
+      li.setAttribute('aria-disabled', 'true');
       li.textContent = 'Sin coincidencias en catálogo.';
       suggestions.appendChild(li);
       return;
     }
 
     const frag = document.createDocumentFragment();
-    matches.forEach(({ row: r }) => {
+    matches.forEach(({ row: r }, index) => {
       const li = document.createElement('li');
       li.className = 'list-group-item';
+      li.setAttribute('role', 'option');
+      li.id = `catalog-suggestion-${index}`;
       const nombre = r[0] || '';
       const codInv = r[1] || 'N/A';
       const bodega = r[2] || '';
@@ -1972,19 +1984,37 @@ async function handleScannedOrImportedCode(code) {
   showScanToast('info', 'Código leído', normalizedCode, { timeout: 1800 });
 
   const existingRow = findExistingRowByCode(normalizedCode);
-  if (existingRow) {
-    if (primarySearchMode === 'list') {
-      syncPrimarySearchToListSearch();
+
+  // En modo “Lista Actual” el escáner se comporta igual que la barra:
+  // solo filtra/ubica filas que ya existen en la tabla construida.
+  // No cambia a Catálogo y no inserta filas.
+  if (primarySearchMode === 'list') {
+    syncPrimarySearchToListSearch();
+
+    const firstMatch = existingRow || getTableRows().find(tr => rowMatchesCurrentListSearch(tr));
+    if (firstMatch) {
+      flashAndFocusRow(firstMatch, 'qty');
+      playScannerFeedback('success');
+      showScanToast('success', 'Encontrado en lista actual', buildChecklistItemFromRow(firstMatch)?.nombre || normalizedCode, { timeout: 2800 });
     } else {
-      suggestions.innerHTML = '';
-      currentFocus = -1;
+      playScannerFeedback('error');
+      showScanToast('error', 'No está en la lista actual', 'Código: ' + normalizedCode, { timeout: 3800 });
     }
+    return true;
+  }
+
+  if (existingRow) {
+    if (suggestions) suggestions.innerHTML = '';
+    currentFocus = -1;
 
     await handleExistingRowAction(existingRow);
     playScannerFeedback('warning');
     showScanToast('warning', 'Producto ya estaba en la lista', buildChecklistItemFromRow(existingRow)?.nombre || normalizedCode, { timeout: 3200 });
     return true;
   }
+
+  // En modo Catálogo sí se permite resolver el código contra el catálogo e insertar si existe.
+  if (searchInput) searchInput.value = normalizedCode;
 
   const beforeCount = getTableRows().length;
   suppressProductAddedToast = true;
@@ -2401,38 +2431,8 @@ async function openInsertedRowsSearch() {
     input.setAttribute('autocomplete', 'off');
   }
 
-  async function openQtyEditor(input) {
-    if (!input) return;
-    const result = await Swal.fire({
-      title: 'Editar cantidad',
-      input: 'text',
-      inputValue: String(input.value || ''),
-      inputLabel: 'Cantidad',
-      inputPlaceholder: 'Escribe la cantidad completa',
-      showCancelButton: true,
-      confirmButtonText: 'Guardar',
-      cancelButtonText: 'Cancelar',
-      inputAttributes: {
-        autocapitalize: 'off',
-        autocorrect: 'off'
-      }
-    });
-
-    if (!result.isConfirmed) return;
-    input.value = String(result.value || '').trim();
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-
-  async function handleQtyInputInteraction(ev) {
-    const input = ev.currentTarget;
-    if (!isCompactScreen() || !input) return;
-    ev.preventDefault();
-    ev.stopPropagation();
-    input.blur();
-    await openQtyEditor(input);
-  }
-
+  // En móvil la cantidad se edita directamente desde la card.
+  // No se usa modal para evitar pasos extra y pérdida de velocidad al capturar.
 
   function updateQtyPreview(input) {
     if (!qtyPreviewBubble) return;
@@ -3966,6 +3966,10 @@ async function handleProductSelection(item) {
     const tr = document.createElement('tr');
     ensureRowDomId(tr);
     const qtyValue = htmlAttrEscape(item.cantidad ?? '');
+    const safeBarcode = escapeHtml(item.codigo_barras || '');
+    const safeName = escapeHtml(item.nombre || '');
+    const safeInventoryCode = escapeHtml(item.codigo_inventario || 'N/A');
+    const safeWarehouse = escapeHtml(item.bodega || '');
     tr.innerHTML = `
       <td class="text-center sticky-col-select row-bulk-select-cell">
         <input
@@ -3975,10 +3979,10 @@ async function handleProductSelection(item) {
         >
       </td>
       <td></td>
-      <td>${item.codigo_barras || ''}</td>
-      <td>${item.nombre || ''}</td>
-      <td>${item.codigo_inventario || 'N/A'}</td>
-      <td>${item.bodega || ''}</td>
+      <td>${safeBarcode}</td>
+      <td>${safeName}</td>
+      <td>${safeInventoryCode}</td>
+      <td>${safeWarehouse}</td>
       <td>
         <input type="text" class="form-control form-control-sm qty" value="${qtyValue}" placeholder="0">
       </td>
@@ -4180,6 +4184,14 @@ async function handleProductSelection(item) {
       return;
     }
 
+    const selectableSuggestions = suggestions
+      ? [...suggestions.querySelectorAll('li:not(.text-muted)')]
+      : [];
+    if (selectableSuggestions.length === 1) {
+      selectableSuggestions[0].click();
+      return;
+    }
+
     const rows = (window.CATALOGO_CACHE && window.CATALOGO_CACHE.length)
       ? window.CATALOGO_CACHE
       : await loadProductsFromGoogleSheets();
@@ -4230,6 +4242,9 @@ async function handleProductSelection(item) {
     if (currentFocus >= items.length) currentFocus = 0;
     if (currentFocus < 0) currentFocus = items.length - 1;
     items[currentFocus].classList.add('active');
+    if (searchInput && items[currentFocus].id) {
+      searchInput.setAttribute('aria-activedescendant', items[currentFocus].id);
+    }
     items[currentFocus].scrollIntoView({ block: 'nearest' });
   }
 
@@ -5641,9 +5656,19 @@ async function handleProductSelection(item) {
     return !/edga|opr|opera|samsungbrowser|firefox|fxios/.test(ua);
   }
 
+  function isMobileOrTouchScannerDevice() {
+    const ua = getUserAgent();
+    if (/android|iphone|ipad|ipod|mobile|tablet/.test(ua)) return true;
+    if (isCompactScreen()) return true;
+    return Number(navigator.maxTouchPoints || 0) > 1 && !/windows nt/.test(ua);
+  }
+
   function getScannerPlatformMode() {
     if (isIosOrIpadOS()) return 'html5';
-    if (isAndroidChrome()) return 'native';
+    if (isAndroidChrome()) {
+      return isNativeBarcodeDetectorAvailable() ? 'native' : 'html5';
+    }
+    if (isMobileOrTouchScannerDevice()) return 'html5';
     return 'input';
   }
 
@@ -5734,7 +5759,6 @@ async function handleProductSelection(item) {
   }
 
   function prepareInputBarcodeScanner() {
-    primarySearchMode = 'catalog';
     updatePrimarySearchModeUI();
 
     if (searchInput) {
@@ -5744,14 +5768,19 @@ async function handleProductSelection(item) {
       if (suggestions) suggestions.innerHTML = '';
       currentFocus = -1;
 
-      try {
-        searchInput.focus({ preventScroll: true });
-      } catch (_err) {
-        try { searchInput.focus(); } catch (_) {}
+      if (!isCompactScreen()) {
+        try {
+          searchInput.focus({ preventScroll: true });
+        } catch (_err) {
+          try { searchInput.focus(); } catch (_) {}
+        }
       }
     }
 
-    showScanToast('info', 'Pistola lista', 'Escanea directamente en la barra de búsqueda y confirma con Enter.', { timeout: 3500 });
+    const scannerHint = primarySearchMode === 'list'
+      ? 'Escanea para buscar solamente dentro de la lista actual. No se agregará ninguna fila.'
+      : 'Escanea directamente en la barra de búsqueda y confirma con Enter.';
+    showScanToast('info', 'Pistola lista', scannerHint, { timeout: 3500 });
   }
 
   async function askForManualBarcodeEntry(message = 'Puedes escribirlo manualmente si la cámara no logra leerlo.') {

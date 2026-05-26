@@ -14,18 +14,23 @@
   });
 
   function normalizeListSearchTerm(value) {
-    return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
   }
 
   function buildRowSearchText(row, colIndex) {
     if (!row?.cells || !colIndex) return '';
-    return [
+    return normalizeListSearchTerm([
       row.cells[colIndex.barcode]?.innerText || '',
       row.cells[colIndex.name]?.innerText || '',
       row.cells[colIndex.inventoryCode]?.innerText || '',
       row.cells[colIndex.warehouse]?.innerText || '',
       row.querySelector('.qty')?.value || ''
-    ].join(' ').toLowerCase();
+    ].join(' '));
   }
 
   function getReviewButton(row) {

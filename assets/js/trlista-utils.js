@@ -11,7 +11,11 @@
 
   function htmlAttrEscape(value) {
     if (value === null || value === undefined) return '';
-    return String(value).replace(/"/g, '&quot;');
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
   }
 
   function escapeHtml(value) {
