@@ -5460,9 +5460,15 @@ async function handleProductSelection(item) {
     }
     activeWarehouseRequest = null;
     activeWarehouseRequestSnapshot = '';
+    if (storeSelect && Array.from(storeSelect.options).some(option => option.value === '__all__')) storeSelect.value = '__all__';
     if (versionSelect && Array.from(versionSelect.options).some(option => option.value === '__all__')) versionSelect.value = '__all__';
     requestFlowState = { status: REQUEST_STATUSES.NONE, requestId: null, submittedAt: null, createdAt: null, itemCount: 0, record: null };
     currentViewDate = null;
+    if (histPicker && typeof histPicker.clear === 'function') {
+      histPicker.clear();
+    } else if (histDateInput) {
+      histDateInput.value = (typeof getTodayString === 'function') ? getTodayString() : '';
+    }
     resetHistoricalUnlock();
     clearHistoricalSelection();
     clearBulkSelection();
@@ -6142,6 +6148,9 @@ async function handleProductSelection(item) {
       dispatchedByEmail
     });
     await syncActiveWarehouseRequest(REQUEST_STATUSES.DISPATCHED);
+    resetSearchState({ mode: 'catalog', clearInput: true, applyFilter: true });
+    clearBulkSelection();
+    updateBulkSelectionUI();
     updateRequestFlowUI();
     await showScanToast('success', 'Solicitud despachada', 'La solicitud quedó marcada como despachada.');
   }
@@ -6174,6 +6183,9 @@ async function handleProductSelection(item) {
       cancelledByEmail
     });
     await syncActiveWarehouseRequest(REQUEST_STATUSES.CANCELLED);
+    resetSearchState({ mode: 'catalog', clearInput: true, applyFilter: true });
+    clearBulkSelection();
+    updateBulkSelectionUI();
     updateRequestFlowUI();
     await showScanToast('success', 'Solicitud cancelada', 'La solicitud quedó cancelada y conservada en el historial.');
   }

@@ -5459,3 +5459,37 @@ body.mobile-actions-open {
     margin-top: 0.7rem !important;
   }
 }
+
+/* === v18 ajuste: Acciones accesible sin volver arriba en móvil === */
+@media (max-width: 767.98px) {
+  #mobileFabToggle.mobile-actions-toggle {
+    position: fixed !important;
+    right: max(0.75rem, env(safe-area-inset-right)) !important;
+    bottom: calc(max(0.75rem, env(safe-area-inset-bottom)) + 0.15rem) !important;
+    z-index: 3300 !important;
+    min-height: 42px !important;
+    padding: 0.52rem 0.9rem !important;
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18) !important;
+  }
+
+  body.mobile-actions-open #mobileFabToggle.mobile-actions-toggle {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .search-mode-meta-row {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    padding-right: 0 !important;
+  }
+
+  .search-mode-meta-row #mobileFabToggle.mobile-actions-toggle {
+    justify-self: end;
+  }
+
+  .mobile-checklist-cards,
+  .table-checklist-shell {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 3.8rem) !important;
+  }
+}
