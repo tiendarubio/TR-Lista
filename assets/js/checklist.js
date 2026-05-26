@@ -139,6 +139,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let autoSaveDirty = false;
   let lastAutoSaveSignature = '';
   let lastAutoSaveToastAt = 0;
+  let suppressMobileCardRefresh = false;
   const AUTO_SAVE_DELAY_MS = 2500;
 
   const REQUEST_STATUSES = Object.freeze({
@@ -353,7 +354,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderCatalogSuggestions(rows, rawQuery) {
     if (!suggestions) return;
     const q = normalizeCatalogText(rawQuery);
-    suggestions.innerHTML = '';
+    if (suggestions) suggestions.innerHTML = '';
     currentFocus = -1;
     if (!q) return;
 
@@ -2161,11 +2162,18 @@ function refreshMobileChecklistCards() {
       </div>
 
       <div class="mobile-card-qty">
-        <button type="button" class="btn mobile-card-qty-btn" aria-label="Editar cantidad">
+        <label class="mobile-card-qty-field">
           <span class="qty-label">Cantidad</span>
-          <span class="qty-value">${escapeHtml(quantity)}</span>
-          <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
-        </button>
+          <input
+            type="text"
+            class="form-control mobile-card-qty-input"
+            value="${htmlAttrEscape(quantity === 'Sin cantidad' ? '' : quantity)}"
+            placeholder="0"
+            autocomplete="off"
+            inputmode="text"
+            aria-label="Cantidad"
+          >
+        </label>
       </div>
 
       <div class="mobile-card-actions" role="group" aria-label="Acciones del producto">
@@ -2195,12 +2203,40 @@ function refreshMobileChecklistCards() {
       });
     }
 
-    card.querySelector('.mobile-card-qty-btn')?.addEventListener('click', async () => {
-      const input = tr.querySelector('.qty');
-      await openQtyEditor(input);
-      updateQtyPreview(null);
-      preserveCompactScroll(() => applyListSearchFilter());
-    });
+    const cardQtyInput = card.querySelector('.mobile-card-qty-input');
+    if (cardQtyInput) {
+      const sourceQtyInput = tr.querySelector('.qty');
+      if (sourceQtyInput) {
+        cardQtyInput.value = sourceQtyInput.value || '';
+        cardQtyInput.disabled = !!sourceQtyInput.disabled;
+
+        cardQtyInput.addEventListener('input', () => {
+          const previousSuppress = suppressMobileCardRefresh;
+          suppressMobileCardRefresh = true;
+          try {
+            sourceQtyInput.value = cardQtyInput.value;
+            sourceQtyInput.dispatchEvent(new Event('input', { bubbles: true }));
+          } finally {
+            suppressMobileCardRefresh = previousSuppress;
+          }
+        });
+
+        cardQtyInput.addEventListener('change', () => {
+          sourceQtyInput.value = cardQtyInput.value;
+          sourceQtyInput.dispatchEvent(new Event('change', { bubbles: true }));
+          if (primarySearchMode === 'list') {
+            preserveCompactScroll(() => applyListSearchFilter());
+          }
+        });
+
+        cardQtyInput.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter') {
+            ev.preventDefault();
+            cardQtyInput.blur();
+          }
+        });
+      }
+    }
 
     card.querySelector('.mobile-action-review')?.addEventListener('click', () => {
       const btn = getReviewButton(tr);
@@ -2263,9 +2299,9 @@ async function openInsertedRowsSearch() {
   primarySearchMode = 'list';
   updatePrimarySearchModeUI();
 
-  if (!isCompactScreen()) {
+  if (!shouldAvoidAutoFocus()) {
     window.setTimeout(() => {
-      searchInput?.focus();
+      searchInput?.focus({ preventScroll: true });
       searchInput?.select();
     }, 120);
   }
@@ -2278,9 +2314,15 @@ async function openInsertedRowsSearch() {
       : window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches;
   }
 
+  function shouldAvoidAutoFocus() {
+    // Se evita el foco programático en todos los tamaños de pantalla.
+    // En PC también podía provocar saltos/zoom visual al agregar productos o cambiar de modo.
+    return true;
+  }
+
   function focusSearchInput(options = {}) {
     const { center = false, select = false } = options || {};
-    if (!searchInput || isCompactScreen()) return;
+    if (!searchInput || shouldAvoidAutoFocus()) return;
 
     const targetSearchBlock = searchInput.closest('.checklist-search-shell');
     if (center && targetSearchBlock) {
@@ -2328,9 +2370,10 @@ async function openInsertedRowsSearch() {
 
   function syncQtyInputMode(input) {
     if (!input) return;
-    input.readOnly = isCompactScreen();
-    input.classList.toggle('qty-mobile-readonly', input.readOnly);
-    input.setAttribute('inputmode', input.readOnly ? 'none' : 'text');
+    input.readOnly = false;
+    input.classList.remove('qty-mobile-readonly');
+    input.setAttribute('inputmode', 'text');
+    input.setAttribute('autocomplete', 'off');
   }
 
   async function openQtyEditor(input) {
@@ -2399,17 +2442,13 @@ async function openInsertedRowsSearch() {
     input.addEventListener('focus', sync);
     input.addEventListener('input', sync);
     input.addEventListener('blur', () => updateQtyPreview(null));
-    input.addEventListener('click', async (ev) => {
-      if (isCompactScreen()) {
-        await handleQtyInputInteraction(ev);
-        return;
-      }
+    input.addEventListener('click', () => {
       sync();
     });
-    input.addEventListener('keydown', async (ev) => {
-      if (!isCompactScreen()) return;
-      if (ev.key === 'Enter' || ev.key === ' ') {
-        await handleQtyInputInteraction(ev);
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' && shouldAvoidAutoFocus()) {
+        ev.preventDefault();
+        input.blur();
       }
     });
     sync();
@@ -3248,7 +3287,7 @@ async function openInsertedRowsSearch() {
   function applyRoleStateToMobileCard(card, tr) {
     if (!card || !tr) return;
 
-    const qtyButton = card.querySelector('.mobile-card-qty-btn');
+    const qtyEditor = card.querySelector('.mobile-card-qty-input');
     const reviewButton = card.querySelector('.mobile-action-review');
     const dispatchButton = card.querySelector('.mobile-action-dispatch');
         const deleteButton = card.querySelector('.mobile-action-delete');
@@ -3257,7 +3296,7 @@ async function openInsertedRowsSearch() {
     const sourceDispatch = getDispatchButton(tr);
         const sourceDelete = getDeleteButton(tr);
 
-    if (qtyButton) qtyButton.disabled = !!qtyInput?.disabled;
+    if (qtyEditor) qtyEditor.disabled = !!qtyInput?.disabled;
     if (reviewButton) {
       reviewButton.disabled = !canUseWarehouseTools() || !!sourceReview?.disabled;
       reviewButton.classList.toggle('d-none', !canUseWarehouseTools());
@@ -3399,19 +3438,13 @@ async function openInsertedRowsSearch() {
   }
 
   // --- Centrar siempre el elemento que tiene el foco (buscador o cantidad) ---
-  function centerOnElement(el) {
-    if (!el || isCompactScreen()) return;
-    setTimeout(() => {
-      const rect = el.getBoundingClientRect();
-      const absoluteTop = rect.top + window.pageYOffset;
-      const middle = absoluteTop - (window.innerHeight / 2) + rect.height / 2;
-      window.scrollTo({ top: middle, behavior: 'smooth' });
-    }, 0);
+  function centerOnElement() {
+    // Desactivado: el centrado automático del foco movía la pantalla en PC y móvil.
   }
 
   document.addEventListener('focusin', (e) => {
     const t = e.target;
-    if (t === searchInput || t.classList.contains('qty')) {
+    if (t === searchInput || t?.classList?.contains('qty') || t?.classList?.contains('mobile-card-qty-input')) {
       centerOnElement(t);
     }
   });
@@ -3521,28 +3554,6 @@ async function openInsertedRowsSearch() {
     }
 
     tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-    window.setTimeout(() => {
-      const qtyInput = tr.querySelector('.qty');
-      const dispatchBtn = getDispatchButton(tr);
-      const reviewBtn = getReviewButton(tr);
-      const focusTarget =
-        (preferredTarget === 'dispatch' ? dispatchBtn : null) ||
-        qtyInput ||
-        dispatchBtn ||
-        reviewBtn ||
-        tr;
-
-      if (focusTarget === tr) {
-        tr.setAttribute('tabindex', '-1');
-      }
-
-      try {
-        focusTarget.focus({ preventScroll: true });
-      } catch (_) {
-        try { focusTarget.focus(); } catch (_) {}
-      }
-    }, 220);
   }
 
   function ensureRowDispatched(tr) {
@@ -3736,6 +3747,9 @@ async function handleProductSelection(item) {
     if (!existingRow) {
       addRowFromData(item, { focusQuantity: true });
       clearSearchUI();
+      if (shouldAvoidAutoFocus()) {
+        try { searchInput?.blur(); } catch (_) {}
+      }
       if (!suppressProductAddedToast) {
         showScanToast('success', 'Producto agregado', item?.nombre || 'Producto agregado', { timeout: 2400 });
       }
@@ -4007,11 +4021,13 @@ async function handleProductSelection(item) {
     const qtyInput = tr.querySelector('.qty');
     if (qtyInput) {
       bindQtyPreview(qtyInput);
-      if (options.focusQuantity && !isCompactScreen()) {
-        qtyInput.focus();
+      if (options.focusQuantity && !shouldAvoidAutoFocus()) {
+        qtyInput.focus({ preventScroll: true });
       }
       qtyInput.addEventListener('input', () => {
-        refreshMobileChecklistCards();
+        if (!suppressMobileCardRefresh) {
+          refreshMobileChecklistCards();
+        }
         updateListSearchMeta();
         queueAutoSave('cantidad');
       });
@@ -4055,7 +4071,7 @@ async function handleProductSelection(item) {
 
       if (primarySearchMode === 'list') {
         syncPrimarySearchToListSearch();
-        if (!isCompactScreen()) {
+        if (!shouldAvoidAutoFocus()) {
           focusSearchInput({ center: false, select: true });
         }
         return;
@@ -5534,30 +5550,78 @@ async function handleProductSelection(item) {
   }
 
   // ====== Barcode Scanner ======
+  const NATIVE_BARCODE_FORMATS = [
+    'ean_13',
+    'ean_8',
+    'upc_a',
+    'upc_e',
+    'code_128',
+    'code_39',
+    'itf',
+    'qr_code'
+  ];
+
+  function getUserAgent() {
+    return String(navigator.userAgent || navigator.vendor || '').toLowerCase();
+  }
+
+  function isIosOrIpadOS() {
+    const ua = getUserAgent();
+    const platform = String(navigator.platform || '').toLowerCase();
+    return /iphone|ipad|ipod/.test(ua) || (platform === 'macintel' && Number(navigator.maxTouchPoints || 0) > 1);
+  }
+
+  function isAndroidChrome() {
+    const ua = getUserAgent();
+    if (!/android/.test(ua)) return false;
+    if (!/chrome\//.test(ua)) return false;
+    return !/edga|opr|opera|samsungbrowser|firefox|fxios/.test(ua);
+  }
+
+  function getScannerPlatformMode() {
+    if (isIosOrIpadOS()) return 'html5';
+    if (isAndroidChrome()) return 'native';
+    return 'input';
+  }
+
+  function isNativeBarcodeDetectorAvailable() {
+    return typeof window !== 'undefined'
+      && typeof window.BarcodeDetector === 'function'
+      && !!navigator.mediaDevices?.getUserMedia;
+  }
+
   function setScanButtonState(isActive) {
     if (!btnScan) return;
 
-    btnScan.classList.remove('btn-outline-primary', 'btn-outline-danger');
+    const mode = getScannerPlatformMode();
+    btnScan.classList.remove('btn-outline-primary', 'btn-outline-danger', 'btn-outline-secondary');
 
     if (isActive) {
       btnScan.classList.add('btn-outline-danger');
       btnScan.title = 'Detener cámara';
       btnScan.setAttribute('aria-label', 'Detener cámara');
       btnScan.innerHTML = '<i class="fa-solid fa-stop me-1"></i><span>Detener</span>';
-    } else {
-      btnScan.classList.add('btn-outline-primary');
-      btnScan.title = 'Escanear código de barras';
-      btnScan.setAttribute('aria-label', 'Escanear código de barras');
-      btnScan.innerHTML = '<i class="fa-solid fa-barcode"></i>';
+      return;
     }
+
+    if (mode === 'input') {
+      btnScan.classList.add('btn-outline-secondary');
+      btnScan.title = 'Usar pistola lectora en la barra de búsqueda';
+      btnScan.setAttribute('aria-label', 'Usar pistola lectora en la barra de búsqueda');
+      btnScan.innerHTML = '<i class="fa-solid fa-keyboard"></i>';
+      return;
+    }
+
+    btnScan.classList.add('btn-outline-primary');
+    btnScan.title = mode === 'native'
+      ? 'Escanear con BarcodeDetector'
+      : 'Escanear con html5-qrcode';
+    btnScan.setAttribute('aria-label', btnScan.title);
+    btnScan.innerHTML = '<i class="fa-solid fa-barcode"></i>';
   }
 
   function canUseHtml5QrCode() {
     return typeof window !== 'undefined' && typeof window.Html5Qrcode === 'function';
-  }
-
-  function shouldUseHtml5QrScanner() {
-    return canUseHtml5QrCode();
   }
 
   function setScannerViewMode(mode = 'native') {
@@ -5580,6 +5644,51 @@ async function handleProductSelection(item) {
       formats.ITF,
       formats.QR_CODE
     ].filter(Boolean);
+  }
+
+  async function getSupportedNativeBarcodeFormats() {
+    try {
+      if (typeof window.BarcodeDetector?.getSupportedFormats !== 'function') {
+        return NATIVE_BARCODE_FORMATS;
+      }
+
+      const supported = await window.BarcodeDetector.getSupportedFormats();
+      const supportedSet = new Set((supported || []).map(format => String(format).toLowerCase()));
+      const preferred = NATIVE_BARCODE_FORMATS.filter(format => supportedSet.has(format));
+      return preferred.length ? preferred : NATIVE_BARCODE_FORMATS;
+    } catch (_err) {
+      return NATIVE_BARCODE_FORMATS;
+    }
+  }
+
+  async function createNativeBarcodeDetector() {
+    const formats = await getSupportedNativeBarcodeFormats();
+    try {
+      return new window.BarcodeDetector({ formats });
+    } catch (_err) {
+      return new window.BarcodeDetector();
+    }
+  }
+
+  function prepareInputBarcodeScanner() {
+    primarySearchMode = 'catalog';
+    updatePrimarySearchModeUI();
+
+    if (searchInput) {
+      searchInput.value = '';
+      searchInput.disabled = false;
+      lastCatalogQuery = '';
+      if (suggestions) suggestions.innerHTML = '';
+      currentFocus = -1;
+
+      try {
+        searchInput.focus({ preventScroll: true });
+      } catch (_err) {
+        try { searchInput.focus(); } catch (_) {}
+      }
+    }
+
+    showScanToast('info', 'Pistola lista', 'Escanea directamente en la barra de búsqueda y confirma con Enter.', { timeout: 3500 });
   }
 
   async function askForManualBarcodeEntry(message = 'Puedes escribirlo manualmente si la cámara no logra leerlo.') {
@@ -5605,6 +5714,55 @@ async function handleProductSelection(item) {
     if (!code) return false;
     await handleScannedOrImportedCode(code);
     return true;
+  }
+
+  async function startNativeBarcodeDetectorScanner() {
+    if (!scanVideo || !isNativeBarcodeDetectorAvailable()) {
+      await askForManualBarcodeEntry('BarcodeDetector no está disponible en este navegador. Ingresa el código manualmente.');
+      return;
+    }
+
+    try {
+      detector = await createNativeBarcodeDetector();
+      setScannerViewMode('native');
+      scanWrap?.classList.add('active');
+      setScanButtonState(true);
+
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+
+      scanVideo.srcObject = mediaStream;
+      scanVideo.setAttribute('playsinline', 'true');
+      await scanVideo.play();
+
+      let detecting = false;
+      scanInterval = window.setInterval(async () => {
+        if (detecting || !detector || !scanVideo || scanVideo.readyState < 2) return;
+        detecting = true;
+        try {
+          const results = await detector.detect(scanVideo);
+          const raw = String(results?.[0]?.rawValue || '').trim();
+          if (raw) await onBarcodeFound(raw);
+        } catch (err) {
+          console.warn('BarcodeDetector decode error:', err);
+        } finally {
+          detecting = false;
+        }
+      }, 180);
+
+      showScanToast('info', 'BarcodeDetector activo', 'Apunta la cámara al código de barras.', { timeout: 2400 });
+    } catch (err) {
+      console.error('BarcodeDetector scanner error:', err);
+      await stopScanner();
+      Swal.fire('Cámara no disponible', 'No se pudo iniciar BarcodeDetector. Puedes ingresar el código manualmente.', 'info')
+        .then(() => askForManualBarcodeEntry());
+    }
   }
 
   async function startHtml5QrScanner() {
@@ -5648,7 +5806,7 @@ async function handleProductSelection(item) {
         () => {}
       );
 
-      showScanToast('info', 'Escáner activo', 'Apunta la cámara al código de barras.', { timeout: 2400 });
+      showScanToast('info', 'html5-qrcode activo', 'Apunta la cámara al código de barras.', { timeout: 2400 });
     } catch (err) {
       console.error('html5-qrcode scanner error:', err);
       await stopScanner();
@@ -5681,8 +5839,15 @@ async function handleProductSelection(item) {
   async function startScanner() {
     if (mediaStream || html5QrScannerActive) return;
 
-    if (!shouldUseHtml5QrScanner()) {
-      await askForManualBarcodeEntry('El escáner de cámara no cargó correctamente. Ingresa o pega el código manualmente.');
+    const mode = getScannerPlatformMode();
+
+    if (mode === 'input') {
+      prepareInputBarcodeScanner();
+      return;
+    }
+
+    if (mode === 'native') {
+      await startNativeBarcodeDetectorScanner();
       return;
     }
 
@@ -5696,6 +5861,8 @@ async function handleProductSelection(item) {
     }
 
     await stopHtml5QrScanner();
+
+    detector = null;
 
     if (mediaStream) {
       mediaStream.getTracks().forEach(t => t.stop());
