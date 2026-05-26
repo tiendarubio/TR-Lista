@@ -70,6 +70,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnFabRequisition = $('btnFabRequisition');
   const btnFabClear = $('btnFabClear');
   const btnFabScrollTop = $('btnFabScrollTop');
+  const btnFabCloseRequest = $('btnFabCloseRequest');
+  const btnFabDispatchRequest = $('btnFabDispatchRequest');
+  const btnFabCancelRequest = $('btnFabCancelRequest');
+  const btnFabMergeRequests = $('btnFabMergeRequests');
+  const btnFabWarehouseNotifications = $('btnFabWarehouseNotifications');
+  const mobileFabRequestSectionTitle = $('mobileFabRequestSectionTitle');
+  const mobileFabToolsSectionTitle = $('mobileFabToolsSectionTitle');
   const searchModeHint = $('searchModeHint');
   const listSearchCount = $('listSearchCount');
   const mobileChecklistCards = $('mobileChecklistCards');
@@ -781,11 +788,70 @@ document.addEventListener('DOMContentLoaded', async () => {
     return 'Activar notificaciones';
   }
 
+  function copyButtonStateToFab(source, target, fallbackIconClassName, fallbackLabel) {
+    if (!target) return false;
+
+    const hidden = !source || source.classList.contains('d-none') || source.getAttribute('aria-hidden') === 'true';
+    target.classList.toggle('d-none', hidden);
+    target.setAttribute('aria-hidden', String(hidden));
+
+    if (hidden) {
+      target.disabled = true;
+      target.setAttribute('aria-disabled', 'true');
+      return false;
+    }
+
+    target.disabled = !!source.disabled;
+    target.setAttribute('aria-disabled', String(target.disabled));
+    target.title = source.title || fallbackLabel || '';
+
+    const sourceIcon = source.querySelector('i');
+    const sourceLabel = source.querySelector('span');
+    const iconClassName = sourceIcon
+      ? Array.from(sourceIcon.classList).filter(cls => cls !== 'me-1' && cls !== 'me-2').join(' ')
+      : fallbackIconClassName;
+    const label = (sourceLabel?.textContent || fallbackLabel || '').trim();
+
+    target.innerHTML = `
+      <i class="${escapeHtml(iconClassName)}" aria-hidden="true"></i>
+      <span>${escapeHtml(label)}</span>
+    `;
+
+    return true;
+  }
+
+  function syncMobileFabWarehouseActions() {
+    const hasActiveRequestActions = [
+      copyButtonStateToFab(btnCloseWarehouseRequest, btnFabCloseRequest, 'fa-solid fa-xmark', 'Cerrar solicitud'),
+      copyButtonStateToFab(btnMarkRequestDispatched, btnFabDispatchRequest, 'fa-solid fa-truck-ramp-box', 'Marcar despachada'),
+      copyButtonStateToFab(btnCancelWarehouseRequest, btnFabCancelRequest, 'fa-solid fa-ban', 'Cancelar solicitud')
+    ].some(Boolean);
+
+    const hasWarehouseTools = [
+      copyButtonStateToFab(btnMergeWarehouseRequests, btnFabMergeRequests, 'fa-solid fa-code-merge', 'Fusionar solicitudes'),
+      copyButtonStateToFab(btnWarehouseNotifications, btnFabWarehouseNotifications, 'fa-regular fa-bell', 'Notificaciones')
+    ].some(Boolean);
+
+    if (mobileFabRequestSectionTitle) {
+      mobileFabRequestSectionTitle.classList.toggle('d-none', !hasActiveRequestActions);
+    }
+
+    if (mobileFabToolsSectionTitle) {
+      mobileFabToolsSectionTitle.classList.toggle('d-none', !hasWarehouseTools);
+    }
+  }
+
   function updateWarehouseNotificationButton() {
-    if (!btnWarehouseNotifications) return;
+    if (!btnWarehouseNotifications) {
+      syncMobileFabWarehouseActions();
+      return;
+    }
     const show = canUseWarehouseTools();
     btnWarehouseNotifications.classList.toggle('d-none', !show);
-    if (!show) return;
+    if (!show) {
+      syncMobileFabWarehouseActions();
+      return;
+    }
 
     const permission = getBrowserNotificationPermission();
     btnWarehouseNotifications.disabled = permission === 'unsupported';
@@ -797,6 +863,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnWarehouseNotifications.innerHTML = permission === 'granted'
       ? '<i class="fa-solid fa-bell me-1" aria-hidden="true"></i><span>Notificaciones ON</span>'
       : '<i class="fa-regular fa-bell me-1" aria-hidden="true"></i><span>' + escapeHtml(getWarehouseNotificationPermissionLabel()) + '</span>';
+
+    syncMobileFabWarehouseActions();
   }
 
   async function requestWarehouseBrowserNotifications() {
@@ -1331,6 +1399,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       btnMergeWarehouseRequests.disabled = !showMerge;
       btnMergeWarehouseRequests.setAttribute('aria-disabled', String(btnMergeWarehouseRequests.disabled));
     }
+
+    syncMobileFabWarehouseActions();
 
     if (requiresWarehouseRequestContext()) {
       const disabledBecauseActive = warehouseHasActive;
@@ -2050,14 +2120,14 @@ function updatePrimarySearchModeUI() {
   const isListMode = primarySearchMode === 'list';
 
   if (searchInput) {
+    const compact = isCompactScreen();
     searchInput.placeholder = isListMode
-      ? 'Buscar en la lista actual'
-      : 'Nombre, código inventario o código de barras';
+      ? (compact ? 'Buscar en lista' : 'Buscar en la lista actual')
+      : (compact ? 'Producto o código' : 'Nombre, código inventario o código de barras');
   }
 
-  if (searchLeadLabel) {
-    searchLeadLabel.textContent = isListMode ? 'Buscar lista' : 'Buscar producto';
-  }
+  const modeLabel = isListMode ? 'Lista' : 'Catálogo';
+  const modeIcon = isListMode ? 'fa-solid fa-table-list' : 'fa-solid fa-box-archive';
 
   if (searchModeHint) {
     searchModeHint.textContent = isListMode ? 'Modo: lista actual' : 'Modo: catálogo';
@@ -2071,9 +2141,10 @@ function updatePrimarySearchModeUI() {
       ? 'Cambiar a búsqueda de catálogo'
       : 'Cambiar a búsqueda en la lista actual';
     btnSearchModeToggle.setAttribute('aria-label', btnSearchModeToggle.title);
-    btnSearchModeToggle.innerHTML = isListMode
-      ? '<i class="fa-solid fa-table-list" aria-hidden="true"></i>'
-      : '<i class="fa-solid fa-box-archive" aria-hidden="true"></i>';
+    btnSearchModeToggle.innerHTML = `
+      <i class="${modeIcon}" aria-hidden="true"></i>
+      <span id="searchLeadLabel">${modeLabel}</span>
+    `;
   }
 
   if (!isListMode) {
@@ -4836,9 +4907,24 @@ async function handleProductSelection(item) {
 
   if (btnFabSearchList) {
     btnFabSearchList.addEventListener('click', async () => {
+      closeMobileFab();
       await openInsertedRowsSearch();
     });
   }
+
+  const bindFabProxyClick = (fabButton, sourceButton) => {
+    if (!fabButton) return;
+    fabButton.addEventListener('click', () => {
+      closeMobileFab();
+      sourceButton?.click();
+    });
+  };
+
+  bindFabProxyClick(btnFabCloseRequest, btnCloseWarehouseRequest);
+  bindFabProxyClick(btnFabDispatchRequest, btnMarkRequestDispatched);
+  bindFabProxyClick(btnFabCancelRequest, btnCancelWarehouseRequest);
+  bindFabProxyClick(btnFabMergeRequests, btnMergeWarehouseRequests);
+  bindFabProxyClick(btnFabWarehouseNotifications, btnWarehouseNotifications);
 
   if (btnFabSortWarehouse) {
     btnFabSortWarehouse.addEventListener('click', () => {

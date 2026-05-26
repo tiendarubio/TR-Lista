@@ -461,7 +461,25 @@
 
   <div id="mobileFabBackdrop" class="mobile-fab-backdrop d-none" aria-hidden="true"></div>
   <div class="mobile-fab-shell d-md-none" aria-label="Acciones rápidas">
-    <div id="mobileFabMenu" class="mobile-fab-menu d-none" aria-hidden="true">
+    <div id="mobileFabMenu" class="mobile-fab-menu d-none" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Acciones rápidas">
+      <div class="mobile-fab-sheet-handle" aria-hidden="true"></div>
+      <div class="mobile-fab-sheet-title">Acciones rápidas</div>
+
+      <div id="mobileFabRequestSectionTitle" class="mobile-fab-section-title d-none">Solicitud activa</div>
+      <button type="button" id="btnFabCloseRequest" class="btn btn-light mobile-fab-menu-btn d-none">
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        <span>Cerrar solicitud</span>
+      </button>
+      <button type="button" id="btnFabDispatchRequest" class="btn btn-success mobile-fab-menu-btn d-none">
+        <i class="fa-solid fa-truck-ramp-box" aria-hidden="true"></i>
+        <span>Marcar despachada</span>
+      </button>
+      <button type="button" id="btnFabCancelRequest" class="btn btn-light mobile-fab-menu-btn mobile-fab-danger d-none">
+        <i class="fa-solid fa-ban" aria-hidden="true"></i>
+        <span>Cancelar solicitud</span>
+      </button>
+
+      <div class="mobile-fab-section-title">Tabla</div>
       <button type="button" id="btnFabSave" class="btn btn-light mobile-fab-menu-btn">
         <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
         <span>Guardar</span>
@@ -482,13 +500,25 @@
         <i class="fa-regular fa-flag" aria-hidden="true"></i>
         <span>Requisición pendiente</span>
       </button>
-      <button type="button" id="btnFabClear" class="btn btn-light mobile-fab-menu-btn mobile-fab-danger">
-        <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
-        <span>Limpiar todo</span>
-      </button>
       <button type="button" id="btnFabScrollTop" class="btn btn-light mobile-fab-menu-btn">
         <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
         <span>Ir arriba</span>
+      </button>
+
+      <div id="mobileFabToolsSectionTitle" class="mobile-fab-section-title d-none">Herramientas</div>
+      <button type="button" id="btnFabMergeRequests" class="btn btn-light mobile-fab-menu-btn d-none">
+        <i class="fa-solid fa-code-merge" aria-hidden="true"></i>
+        <span>Fusionar solicitudes</span>
+      </button>
+      <button type="button" id="btnFabWarehouseNotifications" class="btn btn-light mobile-fab-menu-btn d-none">
+        <i class="fa-regular fa-bell" aria-hidden="true"></i>
+        <span>Notificaciones</span>
+      </button>
+
+      <div class="mobile-fab-section-title mobile-fab-danger-title">Zona de cuidado</div>
+      <button type="button" id="btnFabClear" class="btn btn-light mobile-fab-menu-btn mobile-fab-danger">
+        <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+        <span>Limpiar todo</span>
       </button>
     </div>
     <button type="button" id="mobileFabToggle" class="btn btn-primary mobile-fab-toggle" aria-expanded="false" aria-controls="mobileFabMenu" aria-label="Abrir acciones rápidas">
