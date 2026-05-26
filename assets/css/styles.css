@@ -1083,22 +1083,6 @@ main.container-fluid {
 }
 
 
-/* Selección histórica para merge hacia hoy */
-.history-select-col,
-.history-select-cell {
-  width: 108px;
-  min-width: 108px;
-}
-
-.history-select-all-wrap {
-  white-space: nowrap;
-}
-
-.history-select-cell .form-check-input,
-.history-select-all-wrap .form-check-input {
-  cursor: pointer;
-}
-
 .btn-toolbar .btn-info.text-white {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }

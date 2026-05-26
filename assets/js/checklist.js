@@ -111,7 +111,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const histDateInput = $('histDateInput');
   const btnHistToday = $('btnHistToday');
   const btnToggleHistLock = $('btnToggleHistLock');
-  const btnMergeSelectedToToday = $('btnMergeSelectedToToday');
   const btnHistCalendar = $('btnHistCalendar');
   const histCalendarPanel = $('histCalendarPanel');
 
@@ -469,9 +468,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     return hasRole('admin', 'supervisor');
   }
 
-  function canMergeHistoricalRows() {
-    return hasRole('admin', 'supervisor');
-  }
 
   function canUseWarehouseTools() {
     return hasRole('admin', 'supervisor');
@@ -2856,7 +2852,6 @@ async function openInsertedRowsSearch(options = {}) {
 
   function clearHistoricalSelection() {
     clearBulkSelection();
-    updateHistoricalSelectionUI();
   }
 
   function updateBulkSelectionUI() {
@@ -2946,7 +2941,6 @@ async function openInsertedRowsSearch(options = {}) {
       setToolbarButtonContent(btnDeleteSelected, 'fa-solid fa-trash-can', 'Eliminar');
     }
 
-    updateHistoricalSelectionUI();
     refreshMobileChecklistCards();
   }
 
@@ -3031,257 +3025,6 @@ async function openInsertedRowsSearch(options = {}) {
     await showScanToast('success', 'Filas eliminadas', 'Se eliminaron ' + selectedRows.length + ' fila(s) de la tabla actual.');
   }
 
-  function isHistoricalSelectionAvailable() {
-    return isPastHistoricalDateSelected() && canMergeHistoricalRows();
-  }
-
-  if (chkSelectAllRows) {
-    chkSelectAllRows.addEventListener('change', () => {
-      if (!canUseBulkSelection()) {
-        chkSelectAllRows.checked = false;
-        return;
-      }
-      const shouldCheck = !!chkSelectAllRows.checked;
-      getBulkSelectionCheckboxes().forEach(cb => {
-        if (!cb.disabled) cb.checked = shouldCheck;
-      });
-      refreshMobileChecklistCards();
-      updateBulkSelectionUI();
-    });
-  }
-
-  if (btnReviewSelected) {
-    btnReviewSelected.addEventListener('click', async () => {
-      closeBulkSelectionMoreMenu();
-      await markSelectedRowsWithState('reviewed');
-    });
-  }
-
-  if (btnDispatchSelected) {
-    btnDispatchSelected.addEventListener('click', async () => {
-      closeBulkSelectionMoreMenu();
-      await markSelectedRowsWithState('dispatched');
-    });
-  }
-
-  if (btnDeleteSelected) {
-    btnDeleteSelected.addEventListener('click', async () => {
-      closeBulkSelectionMoreMenu();
-      await deleteSelectedRows();
-    });
-  }
-
-  if (btnBulkSelectionMore) {
-    btnBulkSelectionMore.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      toggleBulkSelectionMoreMenu();
-    });
-  }
-
-  if (btnClearSelection) {
-    btnClearSelection.addEventListener('click', () => {
-      closeBulkSelectionMoreMenu();
-      getBulkSelectionCheckboxes().forEach(cb => {
-        cb.checked = false;
-      });
-      refreshMobileChecklistCards();
-      updateBulkSelectionUI();
-      updateHistoricalSelectionUI();
-    });
-  }
-
-  if (btnToggleSelectAllBulk) {
-    btnToggleSelectAllBulk.addEventListener('click', () => {
-      closeBulkSelectionMoreMenu();
-      const checkboxes = getBulkSelectionCheckboxes().filter(cb => !cb.disabled);
-      if (!checkboxes.length) {
-        updateBulkSelectionUI();
-        return;
-      }
-
-      const shouldSelectAll = checkboxes.some(cb => !cb.checked);
-      checkboxes.forEach(cb => {
-        cb.checked = shouldSelectAll;
-      });
-
-      refreshMobileChecklistCards();
-      updateBulkSelectionUI();
-      updateHistoricalSelectionUI();
-    });
-  }
-
-  function updateHistoricalSelectionUI() {
-    const canMerge = isHistoricalSelectionAvailable();
-
-    if (btnMergeSelectedToToday) {
-      const selectedCount = getSelectedTableRows().length;
-      const shouldShow = false;
-
-      btnMergeSelectedToToday.classList.toggle('d-none', !shouldShow);
-      btnMergeSelectedToToday.disabled = !canMerge || selectedCount === 0;
-      btnMergeSelectedToToday.setAttribute('aria-disabled', String(btnMergeSelectedToToday.disabled));
-      btnMergeSelectedToToday.title = canMerge
-        ? 'Enviar productos seleccionados a la lista de hoy'
-        : '';
-
-      if (shouldShow) {
-        setToolbarButtonContent(btnMergeSelectedToToday, 'fa-solid fa-share-from-square', 'Enviar hoy');
-      }
-    }
-  }
-
-
-  function buildMergeItemFromHistoricalRow(tr) {
-    const item = buildChecklistItemFromRow(tr);
-    return {
-      ...item,
-      revisado: false,
-      despachado: false
-    };
-  }
-
-
-  async function mergeSelectedHistoricalRowsToToday() {
-    try {
-      if (!canMergeHistoricalRows()) {
-        await showRoleDeniedAlert('enviar históricos a hoy', 'supervisores o administradores');
-        return;
-      }
-
-      if (!isHistoricalSelectionAvailable()) {
-        await showScanToast('info', 'No aplica', 'Esta acción solo está disponible cuando estás viendo una fecha anterior.');
-        return;
-      }
-
-      const selectedRows = getSelectedTableRows();
-      if (!selectedRows.length) {
-        await showScanToast('info', 'Sin selección', 'Selecciona al menos un producto histórico para enviarlo a la fecha actual.');
-        return;
-      }
-
-      if (!(await enforceCurrentStoreAccess('mover productos'))) return;
-
-      const storeKey = storeSelect.value;
-      const destinationKeys = getAllDestinationVersionKeys(storeKey);
-
-      if (!destinationKeys.length) {
-        await showScanToast('error', 'Configuración incompleta', 'No hay listas destino disponibles para esta tienda.');
-        return;
-      }
-
-      const destinationOptions = Object.fromEntries(
-        destinationKeys.map(versionKey => [versionKey, getVersionLabel(versionKey)])
-      );
-
-      const selection = await Swal.fire({
-        title: 'Enviar productos a hoy',
-        html: `
-          <div class="text-start small text-muted">
-            Se copiarán <strong>${selectedRows.length}</strong> producto(s) desde la vista histórica hacia una lista del día actual.<br>
-            Los productos que ya existan en el destino se omitirán automáticamente.<br>
-            Los estados <strong>Revisado</strong> y <strong>Despachado</strong> se reiniciarán en la lista de hoy.
-          </div>
-        `,
-        input: 'select',
-        inputOptions: destinationOptions,
-        inputPlaceholder: 'Selecciona la lista destino de hoy',
-        showCancelButton: true,
-        confirmButtonText: 'Enviar a hoy',
-        cancelButtonText: 'Cancelar',
-        inputValidator: (value) => {
-          if (!value) return 'Debes seleccionar una lista destino.';
-          return undefined;
-        }
-      });
-
-      if (!selection.isConfirmed) return;
-
-      const toKey = selection.value;
-      const hasProtectedDestinationAccess = await ensureProtectedDestinationAccess(
-        toKey,
-        'enviar productos a hoy'
-      );
-
-      if (!hasProtectedDestinationAccess) {
-        return;
-      }
-
-      const toDoc = getBinId(storeKey, toKey);
-      const today = (typeof getTodayString === 'function') ? getTodayString() : (typeof getTodayString === 'function' ? getTodayString() : '');
-
-      if (!toDoc || !today) {
-        await showScanToast('error', 'Configuración incompleta', 'No se encontró la lista destino o la fecha actual.');
-        return;
-      }
-
-      const tiendaName = storeSelect.options[storeSelect.selectedIndex].text;
-      let destinationRecord = await loadChecklistFromFirestore(toDoc, today);
-
-      if (!destinationRecord || !Array.isArray(destinationRecord.items)) {
-        destinationRecord = {
-          meta: buildChecklistMeta({
-            storeKey,
-            storeName: tiendaName,
-            versionKey: toKey,
-            requisitionDone: false,
-            requisitionDoneAt: null,
-            updatedAt: null
-          }),
-          items: []
-        };
-      }
-
-      const destinationItems = Array.isArray(destinationRecord.items)
-        ? destinationRecord.items.slice()
-        : [];
-
-      const addedItems = [];
-      const omittedItems = [];
-
-      selectedRows.forEach(tr => {
-        const candidate = buildMergeItemFromHistoricalRow(tr);
-        if (findMatchingItemInArray(destinationItems, candidate)) {
-          omittedItems.push(candidate);
-          return;
-        }
-
-        destinationItems.push(candidate);
-        addedItems.push(candidate);
-      });
-
-      if (!addedItems.length) {
-            await showScanToast('info', 'Sin cambios', 'Todos los productos seleccionados ya existen en la lista de hoy elegida. No se agregó nada.');
-        return;
-      }
-
-      destinationRecord.items = destinationItems;
-      destinationRecord.meta = buildChecklistMeta({
-        storeKey,
-        storeName: tiendaName,
-        versionKey: toKey,
-        requisitionDone: !!destinationRecord.meta?.requisition_done,
-        requisitionDoneAt: destinationRecord.meta?.requisition_done_at || null
-      });
-
-      await saveChecklistToFirestore(toDoc, destinationRecord, today);
-      rememberHistoryDate(toDoc, today);
-      await refreshHistoryPicker();
-
-      clearBulkSelection();
-      updateBulkSelectionUI();
-
-      await showScanToast(
-        'success',
-        'Productos enviados',
-        'Destino: ' + getVersionLabel(toKey) + ' · Agregados: ' + addedItems.length + ' · Omitidos: ' + omittedItems.length,
-        { timeout: 4500 }
-      );
-    } catch (err) {
-      console.error(err);
-      await showScanToast('error', 'Error', 'No se pudieron enviar los productos seleccionados a la lista de hoy. Intenta nuevamente.');
-    }
-  }
 
   function updateHistoricalLockUI() {
     if (!btnToggleHistLock) return;
@@ -3533,11 +3276,6 @@ async function openInsertedRowsSearch(options = {}) {
       btnDeleteSelected.title = canShowBulkDelete ? 'Eliminar seleccionados' : 'Sin permiso para eliminar seleccionados';
     }
 
-    if (btnMergeSelectedToToday) {
-      btnMergeSelectedToToday.classList.add('d-none');
-      btnMergeSelectedToToday.disabled = true;
-      btnMergeSelectedToToday.setAttribute('aria-disabled', 'true');
-    }
 
     Array.from(body?.getElementsByTagName('tr') || []).forEach(tr => applyRolePermissionsToRow(tr, isEditingLocked()));
     refreshMobileChecklistCards();
@@ -3569,7 +3307,6 @@ async function openInsertedRowsSearch(options = {}) {
     });
 
     updateHistoricalLockUI();
-    updateHistoricalSelectionUI();
     updateBulkSelectionUI();
     updateRequisitionUI();
     updateRequestFlowUI();
@@ -4161,7 +3898,6 @@ async function handleProductSelection(item) {
             tr.remove();
             renumber();
             updateBulkSelectionUI();
-            updateHistoricalSelectionUI();
             applyListSearchFilter();
             refreshMobileChecklistCards();
             queueAutoSave('eliminar producto');
@@ -4172,7 +3908,6 @@ async function handleProductSelection(item) {
 
     applyRolePermissionsToRow(tr, isEditingLocked());
     if (!isBulkRenderingRows) {
-      updateHistoricalSelectionUI();
       updateBulkSelectionUI();
     }
 
@@ -4211,7 +3946,6 @@ async function handleProductSelection(item) {
       isBulkRenderingRows = false;
     }
     renumber();
-    updateHistoricalSelectionUI();
     updateBulkSelectionUI();
     applyListSearchFilter();
     refreshMobileChecklistCards();
@@ -5709,11 +5443,6 @@ async function handleProductSelection(item) {
     });
   }
 
-  if (btnMergeSelectedToToday) {
-    btnMergeSelectedToToday.addEventListener('click', async () => {
-      await mergeSelectedHistoricalRowsToToday();
-    });
-  }
 
   if (btnToggleHistLock) {
     btnToggleHistLock.addEventListener('click', async () => {
