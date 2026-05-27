@@ -55,6 +55,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const bulkSelectionCount = $('bulkSelectionCount');
   const btnClearSelection = $('btnClearSelection');
   const btnToggleSelectAllBulk = $('btnToggleSelectAllBulk');
+  const btnBulkSelectionMore = $('btnBulkSelectionMore');
+  const bulkSelectionMoreMenu = $('bulkSelectionMoreMenu');
   const moreActionsMenu = $('moreActionsMenu');
   const warehouseActionsMenu = $('warehouseActionsMenu');
   const appLoadingOverlay = $('appLoadingOverlay');
@@ -1991,9 +1993,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  function closeBulkSelectionMoreMenu() {
+    if (bulkSelectionMoreMenu) {
+      bulkSelectionMoreMenu.classList.add('d-none');
+      bulkSelectionMoreMenu.setAttribute('aria-hidden', 'true');
+    }
+
+    if (btnBulkSelectionMore) {
+      btnBulkSelectionMore.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  function toggleBulkSelectionMoreMenu() {
+    if (!bulkSelectionMoreMenu || !btnBulkSelectionMore || btnBulkSelectionMore.disabled) return;
+
+    const shouldOpen = bulkSelectionMoreMenu.classList.contains('d-none');
+    bulkSelectionMoreMenu.classList.toggle('d-none', !shouldOpen);
+    bulkSelectionMoreMenu.setAttribute('aria-hidden', String(!shouldOpen));
+    btnBulkSelectionMore.setAttribute('aria-expanded', String(shouldOpen));
+  }
+
   function closeAllToolbarMenus() {
     closeMoreActionsMenu();
     closeWarehouseActionsMenu();
+    closeBulkSelectionMoreMenu();
   }
 
   function setMobileFabOpen(shouldOpen) {
@@ -2815,35 +2838,6 @@ async function openInsertedRowsSearch(options = {}) {
       .filter(Boolean);
   }
 
-  function getVisibleBulkSelectionCheckboxes() {
-    return getBulkSelectionCheckboxes().filter(cb => {
-      if (!cb || cb.disabled) return false;
-      const tr = cb.closest('tr');
-      if (!tr) return false;
-      if (tr.classList.contains('table-row-hidden-by-search') || tr.classList.contains('d-none')) return false;
-      if (tr.hidden || tr.style.display === 'none') return false;
-      return true;
-    });
-  }
-
-  function toggleVisibleBulkSelection() {
-    if (!canUseBulkSelection()) return;
-
-    const visibleCheckboxes = getVisibleBulkSelectionCheckboxes();
-    if (!visibleCheckboxes.length) {
-      updateBulkSelectionUI();
-      return;
-    }
-
-    const allVisibleSelected = visibleCheckboxes.every(cb => cb.checked);
-    visibleCheckboxes.forEach(cb => {
-      cb.checked = !allVisibleSelected;
-    });
-
-    updateBulkSelectionUI();
-    refreshMobileChecklistCards();
-  }
-
   function clearBulkSelection() {
     getBulkSelectionCheckboxes().forEach(cb => {
       cb.checked = false;
@@ -2892,6 +2886,7 @@ async function openInsertedRowsSearch(options = {}) {
       bulkSelectionBar.setAttribute('aria-hidden', String(!shouldShow));
       document.body.classList.toggle('has-mobile-selection', shouldShow && isCompactScreen());
 
+      if (!shouldShow) closeBulkSelectionMoreMenu();
     }
 
     if (bulkSelectionCount) {
@@ -2905,6 +2900,12 @@ async function openInsertedRowsSearch(options = {}) {
     if (btnClearSelection) {
       btnClearSelection.disabled = selectedCount === 0;
       btnClearSelection.setAttribute('aria-disabled', String(btnClearSelection.disabled));
+    }
+
+    if (btnBulkSelectionMore) {
+      btnBulkSelectionMore.disabled = selectedCount === 0;
+      btnBulkSelectionMore.setAttribute('aria-disabled', String(btnBulkSelectionMore.disabled));
+      if (selectedCount === 0) closeBulkSelectionMoreMenu();
     }
 
     if (btnToggleSelectAllBulk) {
@@ -3339,6 +3340,16 @@ async function openInsertedRowsSearch(options = {}) {
     if (warehouseActionsMenu?.hasAttribute('open') && !warehouseActionsMenu.contains(target)) {
       closeWarehouseActionsMenu();
     }
+
+    if (
+      bulkSelectionMoreMenu &&
+      btnBulkSelectionMore &&
+      !bulkSelectionMoreMenu.classList.contains('d-none') &&
+      !bulkSelectionMoreMenu.contains(target) &&
+      !btnBulkSelectionMore.contains(target)
+    ) {
+      closeBulkSelectionMoreMenu();
+    }
   });
 
   document.addEventListener('keydown', (e) => {
@@ -3357,44 +3368,6 @@ async function openInsertedRowsSearch(options = {}) {
       }
     });
   });
-
-  if (btnToggleSelectAllBulk) {
-    btnToggleSelectAllBulk.addEventListener('click', () => {
-      if (btnToggleSelectAllBulk.disabled) return;
-        toggleVisibleBulkSelection();
-    });
-  }
-
-  if (btnReviewSelected) {
-    btnReviewSelected.addEventListener('click', async () => {
-      if (btnReviewSelected.disabled) return;
-        await markSelectedRowsWithState('reviewed');
-    });
-  }
-
-  if (btnDispatchSelected) {
-    btnDispatchSelected.addEventListener('click', async () => {
-      if (btnDispatchSelected.disabled) return;
-        await markSelectedRowsWithState('dispatched');
-    });
-  }
-
-  if (btnDeleteSelected) {
-    btnDeleteSelected.addEventListener('click', async () => {
-      if (btnDeleteSelected.disabled) return;
-        await deleteSelectedRows();
-    });
-  }
-
-  if (btnClearSelection) {
-    btnClearSelection.addEventListener('click', async () => {
-      if (btnClearSelection.disabled) return;
-      clearBulkSelection();
-        updateBulkSelectionUI();
-      refreshMobileChecklistCards();
-      await showScanToast('info', 'Selección cancelada', 'Se quitó la selección de productos.');
-    });
-  }
 
   function updateStoreUI() {
     const val = storeSelect.value;
@@ -5578,15 +5551,13 @@ async function handleProductSelection(item) {
     if (!btnScan) return;
 
     const mode = getScannerPlatformMode();
-    btnScan.classList.remove('btn-outline-primary', 'btn-outline-danger', 'btn-outline-secondary', 'btn-danger', 'scanner-stop-btn');
-    btnScan.removeAttribute('aria-pressed');
+    btnScan.classList.remove('btn-outline-primary', 'btn-outline-danger', 'btn-outline-secondary');
 
     if (isActive) {
-      btnScan.classList.add('btn-danger', 'scanner-stop-btn');
+      btnScan.classList.add('btn-outline-danger');
       btnScan.title = 'Detener cámara';
       btnScan.setAttribute('aria-label', 'Detener cámara');
-      btnScan.setAttribute('aria-pressed', 'true');
-      btnScan.innerHTML = '<i class="fa-solid fa-stop" aria-hidden="true"></i>';
+      btnScan.innerHTML = '<i class="fa-solid fa-stop me-1"></i><span>Detener</span>';
       return;
     }
 
@@ -5594,7 +5565,7 @@ async function handleProductSelection(item) {
       btnScan.classList.add('btn-outline-secondary');
       btnScan.title = 'Usar pistola lectora en la barra de búsqueda';
       btnScan.setAttribute('aria-label', 'Usar pistola lectora en la barra de búsqueda');
-      btnScan.innerHTML = '<i class="fa-solid fa-keyboard" aria-hidden="true"></i>';
+      btnScan.innerHTML = '<i class="fa-solid fa-keyboard"></i>';
       return;
     }
 
@@ -5603,7 +5574,7 @@ async function handleProductSelection(item) {
       ? 'Escanear con BarcodeDetector'
       : 'Escanear con html5-qrcode';
     btnScan.setAttribute('aria-label', btnScan.title);
-    btnScan.innerHTML = '<i class="fa-solid fa-barcode" aria-hidden="true"></i>';
+    btnScan.innerHTML = '<i class="fa-solid fa-barcode"></i>';
   }
 
   function canUseHtml5QrCode() {
