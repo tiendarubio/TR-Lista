@@ -849,7 +849,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function syncMobileFabWarehouseActions() {
     const hasActiveRequestActions = [
-      copyButtonStateToFab(btnCloseWarehouseRequest, btnFabCloseRequest, 'fa-solid fa-xmark', 'Cerrar solicitud'),
       copyButtonStateToFab(btnMarkRequestDispatched, btnFabDispatchRequest, 'fa-solid fa-truck-ramp-box', 'Marcar despachada'),
       copyButtonStateToFab(btnCancelWarehouseRequest, btnFabCancelRequest, 'fa-solid fa-ban', 'Cancelar solicitud')
     ].some(Boolean);
@@ -1188,6 +1187,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     return parts.filter(Boolean).join(' · ');
   }
 
+
+  function getActiveRequestExportMeta() {
+    const req = activeWarehouseRequest || requestFlowState?.record || requestFlowState || {};
+    const requestDate = getRequestDateKey(req) || getTargetChecklistDate() || (typeof getTodayString === 'function' ? getTodayString() : '');
+    const printDate = (typeof getTodayString === 'function' ? getTodayString() : new Date().toISOString().slice(0, 10));
+    const requestCode = getFriendlyRequestCode(req);
+    const storeName = req.destinationStoreName || req.storeName || getStoreLabel(req.destinationStoreKey || req.storeKey || storeSelect?.value);
+    const typeLabel = getRequestTypeLabel(req.versionKey || req.version || versionSelect?.value || 'base');
+    return { requestDate, printDate, requestCode, storeName, typeLabel };
+  }
+
+  function updateWarehouseTodayButtonLabel() {
+    if (!btnHistToday) return;
+    const label = btnHistToday.querySelector('span');
+    const icon = btnHistToday.querySelector('i');
+    const isWarehouseActive = requiresWarehouseRequestContext() && hasActiveWarehouseRequest();
+    if (isWarehouseActive) {
+      if (label) label.textContent = 'Cerrar solicitud';
+      if (icon) icon.className = 'fa-solid fa-xmark';
+      btnHistToday.title = 'Cerrar la solicitud activa y volver a la bandeja';
+      btnHistToday.classList.remove('btn-outline-secondary');
+      btnHistToday.classList.add('btn-outline-primary');
+    } else {
+      if (label) label.textContent = 'Hoy';
+      if (icon) icon.className = 'fa-solid fa-rotate-left';
+      btnHistToday.title = 'Volver a hoy';
+      btnHistToday.classList.remove('btn-outline-primary');
+      btnHistToday.classList.add('btn-outline-secondary');
+    }
+  }
+
   function isRequestSentStatus(status) {
     const value = normalizeRequestStatus(status, '');
     return [REQUEST_STATUSES.SENT, REQUEST_STATUSES.REVIEW, REQUEST_STATUSES.PARTIAL_DISPATCH, REQUEST_STATUSES.DISPATCHED, REQUEST_STATUSES.RECEIVED, REQUEST_STATUSES.CANCELLED, REQUEST_STATUSES.MERGED].includes(value);
@@ -1382,7 +1412,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (warehouseRequestMode && warehouseHasActive) {
         const req = activeWarehouseRequest || {};
         const dirtyText = hasUnsavedActiveWarehouseChanges() ? ' · Cambios sin guardar' : '';
-        warehouseInboxMeta.textContent = 'Solicitud activa: ' + getFriendlyRequestCode(req) + ' · ' + getRequestDisplaySubtitle(req) + ' · ' + getRequestStatusLabel(req.status || 'en_revision') + dirtyText + '.';
+        const meta = getActiveRequestExportMeta();
+        warehouseInboxMeta.textContent = 'Solicitud activa: ' + meta.requestCode + ' · ' + getRequestDisplaySubtitle(req) + ' · Fecha solicitud: ' + (meta.requestDate || 'Sin fecha') + ' · ' + getRequestStatusLabel(req.status || 'en_revision') + dirtyText + '.';
+        updateLastSavedText(lastUpdateISO, 'Abierta sin actualización registrada.');
       } else {
         updateWarehouseInboxBadge();
       }
@@ -1401,10 +1433,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       btnCreateWarehouseRequest.setAttribute('aria-disabled', String(btnCreateWarehouseRequest.disabled));
     }
     if (btnCloseWarehouseRequest) {
-      const showClose = warehouseRequestMode && warehouseHasActive;
-      btnCloseWarehouseRequest.classList.toggle('d-none', !showClose);
-      btnCloseWarehouseRequest.disabled = !showClose;
-      btnCloseWarehouseRequest.setAttribute('aria-disabled', String(btnCloseWarehouseRequest.disabled));
+      // Evita dos rutas para lo mismo: en bodega el cierre visible queda en el botón superior “Cerrar solicitud”.
+      btnCloseWarehouseRequest.classList.add('d-none');
+      btnCloseWarehouseRequest.disabled = true;
+      btnCloseWarehouseRequest.setAttribute('aria-disabled', 'true');
     }
     if (btnMarkRequestDispatched) {
       const activeStatus = normalizeRequestStatus(activeWarehouseRequest?.status || '', '');
@@ -1428,6 +1460,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     syncMobileFabWarehouseActions();
+    updateWarehouseTodayButtonLabel();
 
     if (requiresWarehouseRequestContext()) {
       const disabledBecauseActive = warehouseHasActive;
@@ -1471,7 +1504,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <tr>
             <td>${idx + 1}</td>
             <td>${escapeHtml(item.nombre || item.name || '')}</td>
-            <td>${escapeHtml(item.codigoInv || item.inventoryCode || '')}</td>
+            <td>${escapeHtml(item.codigo_inventario || item.codigoInv || item.inventoryCode || item.codigoInventario || '')}</td>
             <td>${escapeHtml(item.bodega || item.warehouse || '')}</td>
             <td class="text-end">${escapeHtml(item.cantidad || item.quantity || '')}</td>
           </tr>
@@ -3554,6 +3587,17 @@ async function openInsertedRowsSearch(options = {}) {
 
   function updateLastSavedText(updatedAt, emptyText = 'Aún no guardado.') {
     lastUpdateISO = updatedAt || null;
+    if (!lastSaved) return;
+    if (requiresWarehouseRequestContext() && hasActiveWarehouseRequest()) {
+      const meta = getActiveRequestExportMeta();
+      const lastText = lastUpdateISO ? ('Última actualización: ' + formatSV(lastUpdateISO)) : emptyText;
+      lastSaved.innerHTML =
+        '<i class="fa-solid fa-clipboard-list me-1 text-primary"></i>' +
+        '<strong>Solicitud abierta:</strong> ' + escapeHtml(meta.requestCode) +
+        ' · <strong>Fecha solicitud:</strong> ' + escapeHtml(meta.requestDate || 'Sin fecha') +
+        ' · ' + escapeHtml(lastText);
+      return;
+    }
     lastSaved.innerHTML =
       '<i class="fa-solid fa-clock-rotate-left me-1"></i>' +
       (lastUpdateISO ? ('Última actualización: ' + formatSV(lastUpdateISO)) : emptyText);
@@ -4428,7 +4472,7 @@ async function handleProductSelection(item) {
     document.body.removeChild(link);
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
   }
-  async function writePdfHeader(doc, tienda, fechaActual, subtitle, extraLine = '') {
+  async function writePdfHeader(doc, tienda, requestDate, printDate, subtitle, extraLine = '') {
     const startX = 12;
     const topY = 10;
 
@@ -4438,18 +4482,18 @@ async function handleProductSelection(item) {
 
     doc.setFontSize(8.5);
     doc.setFont(undefined, 'normal');
-    const infoLine = [tienda, fechaActual].filter(Boolean).join(' · ');
-    doc.text(infoLine, startX, topY + 9);
+    doc.text('Tienda: ' + (tienda || 'Tienda'), startX, topY + 9);
+    doc.text('Fecha solicitud: ' + (requestDate || 'Sin fecha') + ' · Fecha impresión: ' + (printDate || ''), startX, topY + 14);
 
     if (extraLine) {
       const trimmed = String(extraLine || '').trim();
       if (trimmed) {
-        doc.text(trimmed, startX, topY + 14);
-        return 27;
+        doc.text(trimmed, startX, topY + 19);
+        return 31;
       }
     }
 
-    return 22;
+    return 27;
   }
 
   function getPdfTableConfig(variant = 'fleteros') {
@@ -4487,14 +4531,16 @@ async function handleProductSelection(item) {
 
   async function exportPDFGeneral(variant = 'fleteros') {
 
-    const fechaActual = (typeof getTodayString === 'function' ? getTodayString() : '');
-    const tienda = storeSelect.options[storeSelect.selectedIndex].text.trim() || 'Tienda';
+    const exportMeta = getActiveRequestExportMeta();
+    const fechaSolicitud = exportMeta.requestDate;
+    const fechaImpresion = exportMeta.printDate;
+    const tienda = exportMeta.storeName || storeSelect.options[storeSelect.selectedIndex].text.trim() || 'Tienda';
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'landscape' });
     const meta = getPdfVariantMeta(variant);
 
     const rows = buildPdfRows([...body.getElementsByTagName('tr')], variant);
-    const startY = await writePdfHeader(doc, tienda, fechaActual, meta.subtitle);
+    const startY = await writePdfHeader(doc, tienda, fechaSolicitud, fechaImpresion, meta.subtitle);
 
     const pdfTableConfig = getPdfTableConfig(variant);
     doc.autoTable({
@@ -4508,14 +4554,16 @@ async function handleProductSelection(item) {
       columnStyles: pdfTableConfig.columnStyles
     });
 
-    const fileName = `${sanitizeFilePart(tienda)}_${fechaActual}_${meta.fileSuffixGeneral}.pdf`;
+    const fileName = `${sanitizeFilePart(tienda)}_${fechaSolicitud}_${meta.fileSuffixGeneral}.pdf`;
     doc.save(fileName);
     showScanToast('success', 'Éxito', meta.successGeneral);
   }
 
   async function exportPDFPorBodega(selectedWarehouses, variant = 'fleteros') {
-    const fechaActual = (typeof getTodayString === 'function' ? getTodayString() : '');
-    const tienda = storeSelect.options[storeSelect.selectedIndex].text.trim() || 'Tienda';
+    const exportMeta = getActiveRequestExportMeta();
+    const fechaSolicitud = exportMeta.requestDate;
+    const fechaImpresion = exportMeta.printDate;
+    const tienda = exportMeta.storeName || storeSelect.options[storeSelect.selectedIndex].text.trim() || 'Tienda';
     const groups = groupByBodega();
     const selectedGroups = selectedWarehouses
       .filter(name => groups[name]?.length)
@@ -4532,7 +4580,7 @@ async function handleProductSelection(item) {
     if (selectedGroups.length === 1) {
       const [bodega, rowsTr] = selectedGroups[0];
       const doc = new jsPDF({ orientation: 'landscape' });
-      const startY = await writePdfHeader(doc, tienda, fechaActual, meta.subtitle, `Bodega: ${bodega}`);
+      const startY = await writePdfHeader(doc, tienda, fechaSolicitud, fechaImpresion, meta.subtitle, `Bodega: ${bodega}`);
       const pdfTableConfig = getPdfTableConfig(variant);
       doc.autoTable({
         startY,
@@ -4544,7 +4592,7 @@ async function handleProductSelection(item) {
         headStyles: pdfTableConfig.headStyles,
         columnStyles: pdfTableConfig.columnStyles
       });
-      doc.save(`${sanitizeFilePart(tienda)}_${sanitizeFilePart(bodega)}_${fechaActual}_${meta.fileSuffixWarehouse}.pdf`);
+      doc.save(`${sanitizeFilePart(tienda)}_${sanitizeFilePart(bodega)}_${fechaSolicitud}_${meta.fileSuffixWarehouse}.pdf`);
       await showScanToast('success', 'Éxito', meta.successWarehouse);
       return;
     }
@@ -4552,7 +4600,7 @@ async function handleProductSelection(item) {
     const zip = new JSZip();
     for (const [bodega, rowsTr] of selectedGroups) {
       const doc = new jsPDF({ orientation: 'landscape' });
-      const startY = await writePdfHeader(doc, tienda, fechaActual, meta.subtitle, `Bodega: ${bodega}`);
+      const startY = await writePdfHeader(doc, tienda, fechaSolicitud, fechaImpresion, meta.subtitle, `Bodega: ${bodega}`);
       const pdfTableConfig = getPdfTableConfig(variant);
       doc.autoTable({
         startY,
@@ -4565,13 +4613,13 @@ async function handleProductSelection(item) {
         columnStyles: pdfTableConfig.columnStyles
       });
       zip.file(
-        `${sanitizeFilePart(tienda)}_${sanitizeFilePart(bodega)}_${fechaActual}_${meta.fileSuffixWarehouse}.pdf`,
+        `${sanitizeFilePart(tienda)}_${sanitizeFilePart(bodega)}_${fechaSolicitud}_${meta.fileSuffixWarehouse}.pdf`,
         doc.output('arraybuffer')
       );
     }
 
     const content = await zip.generateAsync({ type: 'blob' });
-    saveBlobFile(content, `${sanitizeFilePart(tienda)}_PDF_${meta.label.toUpperCase()}_BODEGAS_${fechaActual}.zip`);
+    saveBlobFile(content, `${sanitizeFilePart(tienda)}_PDF_${meta.label.toUpperCase()}_BODEGAS_${fechaSolicitud}.zip`);
     await showScanToast('success', 'Éxito', meta.successZip);
   }
 
@@ -4766,7 +4814,6 @@ async function handleProductSelection(item) {
     });
   };
 
-  bindFabProxyClick(btnFabCloseRequest, btnCloseWarehouseRequest);
   bindFabProxyClick(btnFabDispatchRequest, btnMarkRequestDispatched);
   bindFabProxyClick(btnFabCancelRequest, btnCancelWarehouseRequest);
   bindFabProxyClick(btnFabMergeRequests, btnMergeWarehouseRequests);
@@ -5346,6 +5393,7 @@ async function handleProductSelection(item) {
     setHistoricalViewMode(false);
     updateBulkSelectionUI();
     updateRequestFlowUI();
+    updateWarehouseTodayButtonLabel();
   }
 
   async function closeWarehouseRequest(options = {}) {
@@ -5496,6 +5544,11 @@ async function handleProductSelection(item) {
     btnHistToday.addEventListener('click', async (event) => {
       event.preventDefault();
       event.stopPropagation();
+      if (requiresWarehouseRequestContext() && hasActiveWarehouseRequest()) {
+        await closeWarehouseRequest({ notify: true });
+        return;
+      }
+
       await withLoading('Volviendo a hoy...', async () => {
         if (histPicker) {
           histPicker.clear();

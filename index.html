@@ -180,7 +180,7 @@
       <div>
         <div class="request-flow-kicker">Bodega</div>
         <h6 class="mb-1">Solicitudes recibidas</h6>
-        <div id="warehouseInboxMeta" class="small text-muted">Consulta las listas enviadas por las sucursales.</div>
+        <div id="warehouseInboxMeta" class="small text-muted">Abre la bandeja directamente; puedes filtrar por sucursal, tipo o fecha solo cuando lo necesites.</div>
       </div>
       <div class="warehouse-actions d-flex flex-wrap gap-2 align-items-center">
         <button type="button" id="btnWarehouseInbox" class="btn btn-outline-primary btn-sm position-relative">
@@ -302,7 +302,7 @@
           <div class="card-body border-top">
             <div id="warehouseIdleNotice" class="alert alert-info d-none mb-3" role="status">
               <div class="fw-semibold"><i class="fa-solid fa-inbox me-1"></i> Bodega sin solicitud abierta</div>
-              <div class="small mb-0">Abre una solicitud desde la bandeja para llenar esta tabla y comenzar la revisión.</div>
+              <div class="small mb-0">Presiona “Ver bandeja” para abrir una solicitud. No necesitas filtrar antes; la bandeja muestra hoy y pendientes anteriores.</div>
             </div>
             <div class="checklist-workspace">
               <div class="checklist-search-shell">
@@ -471,10 +471,6 @@
       </div>
 
       <div id="mobileFabRequestSectionTitle" class="mobile-fab-section-title d-none">Solicitud activa</div>
-      <button type="button" id="btnFabCloseRequest" class="btn btn-light mobile-fab-menu-btn d-none">
-        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-        <span>Cerrar solicitud</span>
-      </button>
       <button type="button" id="btnFabDispatchRequest" class="btn btn-success mobile-fab-menu-btn d-none">
         <i class="fa-solid fa-truck-ramp-box" aria-hidden="true"></i>
         <span>Marcar despachada</span>
