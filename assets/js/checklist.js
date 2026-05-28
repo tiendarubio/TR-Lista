@@ -2380,7 +2380,10 @@ function refreshMobileChecklistCards() {
         cardQtyInput.addEventListener('keydown', (ev) => {
           if (ev.key === 'Enter') {
             ev.preventDefault();
+            sourceQtyInput.value = cardQtyInput.value;
+            sourceQtyInput.dispatchEvent(new Event('change', { bubbles: true }));
             cardQtyInput.blur();
+            focusSearchInput({ center: false, select: true, force: true });
           }
         });
       }
@@ -2468,14 +2471,33 @@ async function openInsertedRowsSearch(options = {}) {
   }
 
   function shouldAvoidAutoFocus() {
-    // Se evita el foco programático en todos los tamaños de pantalla.
-    // En PC también podía provocar saltos/zoom visual al agregar productos o cambiar de modo.
+    // Evita autofoco general para no mover la pantalla.
+    // El flujo principal de captura usa focusSearchInput({ force: true })
+    // y focusQuantityInputForRow() para mantener: buscador -> cantidad -> buscador.
     return true;
   }
 
+  function focusDomInput(input, options = {}) {
+    if (!input || input.disabled) return false;
+
+    const { select = false, preventScroll = true } = options || {};
+
+    try {
+      input.focus({ preventScroll });
+    } catch (_) {
+      try { input.focus(); } catch (_) { return false; }
+    }
+
+    if (select && typeof input.select === 'function') {
+      try { input.select(); } catch (_) {}
+    }
+
+    return document.activeElement === input;
+  }
+
   function focusSearchInput(options = {}) {
-    const { center = false, select = false } = options || {};
-    if (!searchInput || shouldAvoidAutoFocus()) return;
+    const { center = false, select = false, force = false } = options || {};
+    if (!searchInput || (!force && shouldAvoidAutoFocus())) return;
 
     const targetSearchBlock = searchInput.closest('.checklist-search-shell');
     if (center && targetSearchBlock) {
@@ -2483,16 +2505,39 @@ async function openInsertedRowsSearch(options = {}) {
     }
 
     window.setTimeout(() => {
-      try {
-        searchInput.focus({ preventScroll: !center });
-      } catch (_) {
-        try { searchInput.focus(); } catch (_) {}
+      focusDomInput(searchInput, { select, preventScroll: !center });
+    }, center ? 220 : 90);
+  }
+
+  function focusQuantityInputForRow(tr, options = {}) {
+    if (!tr) return;
+
+    const { select = true, center = false, delay = null } = options || {};
+    const ms = Number.isFinite(delay) ? delay : (isCompactScreen() ? 140 : 70);
+
+    window.setTimeout(() => {
+      if (isCompactScreen()) {
+        refreshMobileChecklistCards();
+        const card = getMobileCardForRow(tr);
+        const mobileQtyInput = card?.querySelector('.mobile-card-qty-input');
+
+        if (mobileQtyInput && !mobileQtyInput.disabled) {
+          if (center && card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          focusDomInput(mobileQtyInput, { select, preventScroll: true });
+          return;
+        }
       }
 
-      if (select && typeof searchInput.select === 'function') {
-        searchInput.select();
+      const qtyInput = tr.querySelector('.qty');
+      if (!qtyInput || qtyInput.disabled) return;
+
+      if (center && !isCompactScreen()) {
+        tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
-    }, center ? 220 : 90);
+      focusDomInput(qtyInput, { select, preventScroll: true });
+    }, ms);
   }
 
   function applyResponsiveRowLabels(tr) {
@@ -2569,9 +2614,10 @@ async function openInsertedRowsSearch(options = {}) {
       sync();
     });
     input.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Enter' && shouldAvoidAutoFocus()) {
+      if (ev.key === 'Enter') {
         ev.preventDefault();
         input.blur();
+        focusSearchInput({ center: false, select: true, force: true });
       }
     });
     sync();
@@ -3941,9 +3987,6 @@ async function handleProductSelection(item) {
     const qtyInput = tr.querySelector('.qty');
     if (qtyInput) {
       bindQtyPreview(qtyInput);
-      if (options.focusQuantity && !shouldAvoidAutoFocus()) {
-        qtyInput.focus({ preventScroll: true });
-      }
       qtyInput.addEventListener('input', () => {
         if (!suppressMobileCardRefresh) {
           refreshMobileChecklistCards();
@@ -3952,15 +3995,19 @@ async function handleProductSelection(item) {
         queueAutoSave('cantidad');
       });
       qtyInput.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Enter' && !isCompactScreen()) {
+        if (ev.key === 'Enter') {
           ev.preventDefault();
-          focusSearchInput({ center: false, select: true });
+          focusSearchInput({ center: false, select: true, force: true });
         }
       });
     }
 
     if (!isBulkRenderingRows) {
       applyListSearchFilter();
+    }
+
+    if (options.focusQuantity) {
+      focusQuantityInputForRow(tr, { select: true, center: false });
     }
   }
 
